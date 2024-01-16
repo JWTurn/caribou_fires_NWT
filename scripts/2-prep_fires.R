@@ -37,9 +37,12 @@ fire_coords <- st_as_sf(hotspots, coords = c('lon', 'lat')) %>%
 
 fire_nwt <- st_join(fire_coords, nwt.wgs, join = st_within) %>%
   filter(PREABBR == 'N.W.T.')
+fire_nwt.df <- setDT(sfheaders::sf_to_df(fire_nwt, fill = T))
 
 progression_nwt <- progression %>%
   st_transform(crs) %>%
   st_join(nwt.wgs, join = st_within) %>%
   filter(PREABBR == 'N.W.T.')
 
+# get baselayer
+map <- get_map("Northwest Territories")
