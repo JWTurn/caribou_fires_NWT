@@ -5,9 +5,11 @@
 require(data.table)
 require(sf)
 require(terra)
+require(tidyterra)
 require(dplyr)
 require(ggplot2)
 require(ggmap)
+#require(basemaps)
 require(gganimate)
 require(gifski)
 
@@ -25,7 +27,9 @@ burns <- st_read(file.path(raw, 'FireShapefiles', 'brnGEE_2023_Merge.shp'))
 canPoly <- st_read(file.path(canada, 'CanadaPoly', 'lpr_000b16a_e.shp'))
 
 # prep ----
-crs <- st_crs(4326)$wkt
+# pseudo mercator
+crs <- st_crs(3857)$wkt
+#crs <- st_crs(4326)$wkt
 
 nwt <- filter(canPoly, PREABBR %in% c('N.W.T.'))
 nwt.wgs <- st_transform(nwt, crs)
@@ -33,16 +37,62 @@ nwt.wgs <- st_transform(nwt, crs)
 
 # get fires within NWT ----
 fire_coords <- st_as_sf(hotspots, coords = c('lon', 'lat')) %>%
-  st_set_crs(crs) 
+  st_set_crs(4326) %>%
+  st_transform(crs)
 
 fire_nwt <- st_join(fire_coords, nwt.wgs, join = st_within) %>%
   filter(PREABBR == 'N.W.T.')
 fire_nwt.df <- setDT(sfheaders::sf_to_df(fire_nwt, fill = T))
+fire_nwt.df$datetime <- fire_nwt.df$rep_date
 
 progression_nwt <- progression %>%
   st_transform(crs) %>%
   st_join(nwt.wgs, join = st_within) %>%
   filter(PREABBR == 'N.W.T.')
+# create datetime in common format
+## set hours to end of day
+progression_nwt$datetime <- as.POSIXct(paste0(as.character(progression_nwt$DATE), ' 23:59:59'), tz = 'UTC', 
+                                       format ='%Y%m%d %H:%M:%OS')
 
-# get baselayer
-map <- get_map("Northwest Territories")
+# get baselayer ----
+myloc <- st_bbox(nwt.wgs)
+names(myloc) <- c('left', 'bottom', 'right', 'top')
+
+# setting defaults outside of this b/c need an API from stadiamaps.com
+## register_stadiamaps(key = "xxxxx")
+nwtmap <- get_map(location = myloc, source = 'stadia', maptype = 'stamen_terrain', crop = F)
+
+ggmap(nwtmap)
+
+# hotspot animation
+p.fire.data <- ggmap(nwtmap) +
+  geom_point(data = fire_nwt.df, aes(x=x, y=y, color = 'darkorange'), show.legend = F) 
+p.fire.data
+
+p.prog.data <- ggmap(nwtmap) +
+  geom_sf(data = progression_nwt, inherit.aes = FALSE) 
+p.prog.data
+
+p.fire.prog.data <- ggmap(nwtmap) +
+  geom_sf(data = progression_nwt, inherit.aes = FALSE, color = 'maroon') +
+  geom_point(data = fire_nwt.df, aes(x=x, y=y, color = 'darkorange'), size =0.05, 
+             show.legend = F) +
+  coord_sf(crs = crs)
+p.fire.prog.data
+  
+p.fire.anim <- p.fire.data +
+  shadow_wake(wake_length = 0.5) +
+  transition_time(datetime) +
+  labs(title="{frame_time}", x="Longitude", y="Latitude")
+
+num_frames <- length(unique(fire_nwt.df$datetime))
+animate(p.fire.anim, nframes = 100, fps = 2)
+
+
+###########
+# mapbox.com for `basemaps`
+## set_defaults(map_service = "mapbox", map_token = 'usr_API')
+
+ggplot() +
+  basemap_gglayer(myloc, map_type = 'light')
+
