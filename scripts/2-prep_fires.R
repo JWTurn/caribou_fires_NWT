@@ -28,8 +28,8 @@ canPoly <- st_read(file.path(canada, 'CanadaPoly', 'lpr_000b16a_e.shp'))
 
 # prep ----
 # pseudo mercator
-crs <- st_crs(3857)$wkt
-#crs <- st_crs(4326)$wkt
+#crs <- st_crs(3857)$wkt
+crs <- st_crs(4326)$wkt
 
 nwt <- filter(canPoly, PREABBR %in% c('N.W.T.'))
 nwt.wgs <- st_transform(nwt, crs)
@@ -37,22 +37,33 @@ nwt.wgs <- st_transform(nwt, crs)
 
 # get fires within NWT ----
 fire_coords <- st_as_sf(hotspots, coords = c('lon', 'lat')) %>%
-  st_set_crs(4326) %>%
-  st_transform(crs)
+  st_set_crs(4326) #%>%
+  #st_transform(crs)
 
 fire_nwt <- st_join(fire_coords, nwt.wgs, join = st_within) %>%
   filter(PREABBR == 'N.W.T.')
 fire_nwt.df <- setDT(sfheaders::sf_to_df(fire_nwt, fill = T))
 fire_nwt.df$datetime <- fire_nwt.df$rep_date
+saveRDS(fire_nwt.df, file.path(raw, 'hotspots2023_nwt.RDS'))
 
+# I don't think this is catching all fires in the progression
 progression_nwt <- progression %>%
   st_transform(crs) %>%
   st_join(nwt.wgs, join = st_within) %>%
   filter(PREABBR == 'N.W.T.')
+#progression_nwt <- st_crop(progression_nwt, nwt.wgs)
+
 # create datetime in common format
 ## set hours to end of day
 progression_nwt$datetime <- as.POSIXct(paste0(as.character(progression_nwt$DATE), ' 23:59:59'), tz = 'UTC', 
                                        format ='%Y%m%d %H:%M:%OS')
+st_write(progression_nwt, file.path(raw, 'progression_nwt.shp'))
+
+# take a quick look
+ggplot() +
+  geom_point(data = fire_nwt.df, aes(x=x, y=y, color = 'darkorange'), show.legend = F) +
+  geom_sf(data = progression_nwt) 
+
 
 # get baselayer ----
 myloc <- st_bbox(nwt.wgs)
