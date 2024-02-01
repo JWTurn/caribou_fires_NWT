@@ -18,18 +18,18 @@ derived <- file.path('data', 'derived')
 
 # study names to fill in loop
 # had to go through names on movebank and accept terms for each...
-dsNames <-c('Dehcho Boreal Woodland', 
-            'North Slave Boreal', 'South Slave Boreal Woodland') 
+dsNames <-c('Dehcho Boreal Woodland Caribou', 
+            'Sahtu Boreal Woodland Caribou (2020)', 'South Slave Boreal Woodland Caribou') 
 
 
 
 # make a list of all data from Movebank
 # accepted terms of use on Movebank
-# LAST downloaded 10 Jan. 2024
+# LAST downloaded 01 Feb. 2024
 move <- list()
 for (ds in 1:length(dsNames)) {
   #hh = 1
-  move[[ds]]<-movebank_download_study(study =paste0( 'GNWT ', dsNames[[ds]],' Caribou'), 
+  move[[ds]]<-movebank_download_study(study =paste0( 'GNWT ', dsNames[[ds]]), 
                                       timestamp_start = as.POSIXct("2023-01-01 00:00:00"),
                                       timestamp_end = as.POSIXct("2023-12-31 23:59:59"))
 }
@@ -39,7 +39,7 @@ for (ds in 1:length(dsNames)) {
 move.meta <- list()
 for (ds in 1:length(dsNames)) {
   #hh = 1
-  move.meta[[ds]]<-movebank_download_deployment(study =paste0( 'GNWT ', dsNames[[ds]],' Caribou'), 
+  move.meta[[ds]]<-movebank_download_deployment(study =paste0( 'GNWT ', dsNames[[ds]]), 
                                                 timestamp_start = as.POSIXct("2023-01-01 00:00:00"),
                                                 timestamp_end = as.POSIXct("2023-12-31 23:59:59"))
 }
@@ -47,7 +47,7 @@ for (ds in 1:length(dsNames)) {
 
 
 # pull just the data
-hab <-c('dehcho', 'north.slave', 'south.slave') 
+hab <-c('dehcho', 'sahtu', 'south.slave') 
 
 move.combo <- data.table()
 move.combo <- rbindlist(lapply(1:length(hab), function(hh){
