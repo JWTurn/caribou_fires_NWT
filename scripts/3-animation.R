@@ -29,13 +29,16 @@ canPoly <- st_read(file.path(canada, 'CanadaPoly', 'lpr_000b16a_e.shp'))
 
 # prep ----
 # pseudo mercator
-#crs <- st_crs(3857)$wkt
+crs.web <- st_crs(3857)$wkt
 crs <- st_crs(4326)$wkt
 
 nwt <- filter(canPoly, PREABBR %in% c('N.W.T.'))
 nwt.wgs <- st_transform(nwt, crs)
 
 ## caribou ----
+# make a grouping variable for time of day
+cbou[,tod:=lubridate::ceiling_date(timestamp, unit = '8 hours')]
+
 cbou.MayOct <- cbou[timestamp>= as.POSIXct('2023-05-01', tz='UTC') & timestamp < as.POSIXct('2023-10-01', tz='UTC')]
 cbou.MayOct$datetime <- cbou.MayOct$timestamp
 ggplot() +
@@ -63,20 +66,23 @@ sahtu.ext <- st_bbox(sahtu.coords)
 s.slave.ext <- st_bbox(s.slave.coords)
 
 ## fires to bou area ----
-hotspots.bou <- st_as_sf(hotspots, coords = c('x', 'y')) %>%
+hotspots.sub <- hotspots[datetime < as.POSIXct('2023-10-01', tz='UTC')]
+# make a grouping variable for time of day
+hotspots.sub[, tod := lubridate::ceiling_date(datetime, unit = '8 hours')]
+hotspots.bou <- st_as_sf(hotspots.sub, coords = c('x', 'y')) %>%
   st_set_crs(4326) %>%
   st_crop(cbou.ext)
 plot(hotspots.bou$geometry)
 
-hotspots.dehcho <- st_as_sf(hotspots, coords = c('x', 'y')) %>%
+hotspots.dehcho <- st_as_sf(hotspots.sub, coords = c('x', 'y')) %>%
   st_set_crs(4326) %>%
   st_crop(dehcho.ext)
 
-hotspots.sahtu <- st_as_sf(hotspots, coords = c('x', 'y')) %>%
+hotspots.sahtu <- st_as_sf(hotspots.sub, coords = c('x', 'y')) %>%
   st_set_crs(4326) %>%
   st_crop(sahtu.ext)
 
-hotspots.sslave <- st_as_sf(hotspots, coords = c('x', 'y')) %>%
+hotspots.sslave <- st_as_sf(hotspots.sub, coords = c('x', 'y')) %>%
   st_set_crs(4326) %>%
   st_crop(s.slave.ext)
 
@@ -86,6 +92,26 @@ hotspots.df <- setDT(sfheaders::sf_to_df(hotspots.bou, fill = T))
 hotspots.dehcho.df <- setDT(sfheaders::sf_to_df(hotspots.dehcho, fill = T))
 hotspots.sahtu.df <- setDT(sfheaders::sf_to_df(hotspots.sahtu, fill = T))
 hotspots.sslave.df <- setDT(sfheaders::sf_to_df(hotspots.sslave, fill = T))
+
+
+
+progression.sub <- filter(progression, datetime < as.POSIXct('2023-10-01', tz='UTC'))
+progression.sub$datetime <- as.POSIXct(paste0(as.character(progression.sub$DATE), ' 23:59:59'), tz = 'UTC', 
+                                       format ='%Y%m%d %H:%M:%OS')
+
+progression.bou <- progression.sub %>%
+  st_crop(cbou.ext)
+plot(progression.bou$geometry)
+
+progression.dehcho <- progression.sub %>%
+  st_crop(dehcho.ext)
+
+progression.sahtu <- progression.sub %>%
+  st_crop(sahtu.ext)
+
+progression.sslave <- progression.sub %>%
+  st_crop(s.slave.ext)
+
 
 
 # get baselayer ----
@@ -102,16 +128,20 @@ nwtmap <- get_map(location = myloc, source = 'stadia', maptype = 'stamen_terrain
 dehchomap <- get_map(location = dehcho.ext, source = 'stadia', maptype = 'stamen_terrain', 
                   crop = FALSE, zoom = 8)
 sahtumap <- get_map(location = sahtu.ext, source = 'stadia', maptype = 'stamen_terrain', 
-                     crop = FALSE, zoom = 6)
+                     crop = FALSE, zoom = 8)
 sslavemap <- get_map(location = s.slave.ext, source = 'stadia', maptype = 'stamen_terrain', 
-                     crop = FALSE, zoom = 6)
+                     crop = FALSE, zoom = 9)
+
+ggplot() +
+  geom_point(data = hotspots.df, aes(x=x, y=y, color = 'darkorange'), size = 0.3, show.legend = F) +
+  geom_sf(data = progression) 
 
 p.data <- ggmap(nwtmap) +
   geom_point(data = cbou.MayOct, aes(x=x, y=y, group = id, color = id), show.legend = F) +
   # geom_path(data = cbou.MayOct, 
   #           aes(x=x, y=y, group = id, color = id), 
   #           alpha = 0.3, show.legend = F) +
-  geom_point(data = hotspots.df, aes(x=x, y=y), color = 'darkorange', show.legend = F) +
+  geom_point(data = hotspots.df, aes(x=x, y=y), shape = 17, color = 'darkorange', show.legend = F) +
   scale_color_viridis_d()
 p.data
 
@@ -131,7 +161,7 @@ p.dehcho <- ggmap(dehchomap) +
   geom_path(data = dehcho,
             aes(x=x, y=y, group = id, color = id),
             alpha = 0.3, show.legend = F) +
-  geom_point(data = hotspots.dehcho.df, aes(x=x, y=y, group = datetime), color = 'darkorange', fill = NA, show.legend = F) +
+  geom_point(data = hotspots.dehcho.df, aes(x=x, y=y, group = tod), shape = 17, color = 'darkorange', fill = NA, show.legend = F) +
   scale_color_viridis_d()
 p.dehcho
 
@@ -145,4 +175,55 @@ p.dehcho.anim <- p.dehcho +
 #num_frames <- length(unique(cbou.MayOct$datetime))
 num_frames <- as.integer(as.POSIXct('2023-10-01', tz='UTC') - as.POSIXct('2023-05-01', tz='UTC'))*3
 animate(p.dehcho.anim, nframes = num_frames, fps = 3)
+anim_save(("dehcho_test.gif"))
 length(unique(dehcho$id))
+
+
+### South Slave ----
+s.slave[,tod := lubridate::ceiling_date(timestamp, "8 hours")]
+p.sslave <- ggmap(sslavemap) +
+  #geom_polygon(data = progression.sslave, aes(group = datetime), fill = 'maroon', inherit.aes = F) +
+  geom_point(data = s.slave, aes(x=x, y=y, group = id, color = id), show.legend = F) +
+  geom_path(data = s.slave,
+            aes(x=x, y=y, group = id, color = id),
+            alpha = 0.3, show.legend = F) +
+  geom_point(data = hotspots.sslave.df, aes(x=x, y=y, group = seq_along(tod)), 
+             shape = 17, color = 'darkorange', show.legend = F) +
+  scale_color_viridis_d()
+p.sslave
+
+p.sslave.anim <- p.sslave +
+  transition_reveal(tod) +
+  # transition_time(datetime) +
+  # shadow_trail(distance = 0.01, max_frames = 10) + 
+  ease_aes('linear') +
+  labs(title="{frame_along}", x="Longitude", y="Latitude")
+
+#num_frames <- as.integer(as.POSIXct('2023-10-01', tz='UTC') - as.POSIXct('2023-05-01', tz='UTC'))*3
+num_frames <- length(unique(hotspots.sslave.df$tod))
+animate(p.sslave.anim, nframes = num_frames, fps = 2)
+anim_save(("sslave_test.gif"))
+length(unique(sslave$id))
+
+progression.sslave$tod <- lubridate::ceiling_date(progression.sslave$datetime, "8 hours")
+progression.sslave.prj <- st_transform(progression.sslave, crs.web)
+p.sslave2 <- ggmap(sslavemap) +
+  geom_sf(data = progression.sslave.prj, fill = 'maroon', color = 'maroon', inherit.aes = F) +
+  geom_point(data = hotspots.sslave.df, aes(x=x, y=y, group = seq_along(tod)), 
+             shape = 17, color = 'darkorange', show.legend = F) +
+  geom_point(data = s.slave, aes(x=x, y=y, group = id, color = id), show.legend = F) +
+  geom_path(data = s.slave,
+            aes(x=x, y=y, group = id, color = id),
+            alpha = 0.3, show.legend = F) +
+  scale_color_viridis_d() + 
+  coord_sf(crs = crs)
+p.sslave.anim2 <- p.sslave2 +
+  #transition_reveal(tod) +
+  transition_states(tod) +
+  #shadow_wake(wake_length = 0.01) +
+  #shadow_trail(distance = 0.01, max_frames = 10) + 
+  exit_shrink() +
+  ease_aes('linear') +
+  labs(title="{frame_time}", x="Longitude", y="Latitude")
+animate(p.sslave.anim2, nframes = num_frames, fps = 2)
+
