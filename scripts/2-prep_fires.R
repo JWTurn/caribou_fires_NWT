@@ -19,9 +19,13 @@ derived <- file.path('data', 'derived')
 canada <- file.path('~/Dropbox', 'ActiveDocs', 'Git-local', 'Can_GIS_layers')
 
 
-hotspots <- fread(file.path(raw, 'hotspots2023.csv'))
+hotspots <- fread(file.path(raw, 'cwfis', 'hotspots2023.csv'))
 
+perims <- st_read(file.path(raw, 'cwfis', 'perimeters.shp'))
+
+#progression <- st_read(file.path(raw, 'cwfis', 'progression.shp')) # doesn't have associated crs?
 progression <- st_read(file.path(raw, 'FireShapefiles', 'progression.shp'))
+
 burns <- st_read(file.path(raw, 'FireShapefiles', 'brnGEE_2023_Merge.shp'))
 
 canPoly <- st_read(file.path(canada, 'CanadaPoly', 'lpr_000b16a_e.shp'))
@@ -30,6 +34,7 @@ canPoly <- st_read(file.path(canada, 'CanadaPoly', 'lpr_000b16a_e.shp'))
 # pseudo mercator
 #crs <- st_crs(3857)$wkt
 crs <- st_crs(4326)$wkt
+p.crs <- st_crs(progression)$wkt
 
 nwt <- filter(canPoly, PREABBR %in% c('N.W.T.'))
 nwt.wgs <- st_transform(nwt, crs)
@@ -48,21 +53,31 @@ saveRDS(fire_nwt.df, file.path(raw, 'hotspots2023_nwt.RDS'))
 
 # I don't think this is catching all fires in the progression
 progression_nwt <- progression %>%
+ # st_set_crs(p.crs) %>%
   st_transform(crs) %>%
-  st_join(nwt.wgs, join = st_within) %>%
-  filter(PREABBR == 'N.W.T.')
+  # st_join(nwt.wgs, join = st_intersects) %>%
+  # filter(PREABBR == 'N.W.T.') %>%
+  st_intersection(nwt.wgs)
+  #st_crop(st_bbox(nwt.wgs))
 #progression_nwt <- st_crop(progression_nwt, nwt.wgs)
 
 # create datetime in common format
 ## set hours to end of day
 progression_nwt$datetime <- as.POSIXct(paste0(as.character(progression_nwt$DATE), ' 23:59:59'), tz = 'UTC', 
                                        format ='%Y%m%d %H:%M:%OS')
-st_write(progression_nwt, file.path(raw, 'progression_nwt.shp'))
+st_write(progression_nwt, file.path(raw, 'progression_nwt.shp'), append = F)
+
+perims_nwt <- perims %>%
+  st_set_crs(p.crs) %>%
+  st_transform(crs) %>%
+  st_join(nwt.wgs, join = st_intersects) %>%
+  filter(PREABBR == 'N.W.T.')
 
 # take a quick look
 ggplot() +
-  geom_point(data = fire_nwt.df, aes(x=x, y=y, color = 'darkorange'), show.legend = F) +
-  geom_sf(data = progression_nwt) 
+  geom_sf(data = nwt.wgs) +
+  geom_point(data = fire_nwt.df, aes(x=x, y=y, color = 'darkorange'), shape = 17, size = 0.1, show.legend = F) +
+  geom_sf(data = progression_nwt)
 
 
 # get baselayer ----
