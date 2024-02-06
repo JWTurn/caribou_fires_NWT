@@ -170,29 +170,78 @@ animate(p.anim, nframes = num_frames)
 
 ### Dehcho ----
 p.dehcho <- ggmap(dehchomap) +
+  geom_point(data = hotspots.dehcho.df, aes(x=x, y=y, group = seq_along(tod)), 
+             shape = 17, color = 'darkorange', show.legend = F) +
   geom_point(data = dehcho, aes(x=x, y=y, group = id, color = id), show.legend = F) +
-  geom_path(data = dehcho,
-            aes(x=x, y=y, group = id, color = id),
-            alpha = 0.3, show.legend = F) +
-  geom_point(data = hotspots.dehcho.df, aes(x=x, y=y, group = tod), shape = 17, color = 'darkorange', fill = NA, show.legend = F) +
-  scale_color_viridis_d()
-p.dehcho
+  # geom_path(data = s.slave,
+  #           aes(x=x, y=y, group = id, color = id),
+  #           alpha = 0.3, show.legend = F) +
+  scale_color_viridis_d() 
+
 
 p.dehcho.anim <- p.dehcho +
-  transition_reveal(datetime) +
-  # transition_time(datetime) +
-  # shadow_trail(distance = 0.01, max_frames = 10) + 
+  transition_time(tod) +
+  shadow_mark(color = 'maroon', alpha = 0.25, exclude_layer = 5) +
+  exit_shrink() +
   ease_aes('linear') +
-  labs(title="{frame_along}", x="Longitude", y="Latitude")
+  labs(title="{frame_time}", x="Longitude", y="Latitude")
 
-#num_frames <- length(unique(cbou.MayOct$datetime))
-num_frames <- as.integer(as.POSIXct('2023-10-01', tz='UTC') - as.POSIXct('2023-05-01', tz='UTC'))*3
-animate(p.dehcho.anim, nframes = num_frames, fps = 3)
-anim_save(("dehcho_test.gif"))
-length(unique(dehcho$id))
+num_frames <- length(unique(dehcho$tod))
+animate(p.dehcho.anim, nframes = num_frames, fps = 2)
+anim_save(file.path('anims', "dehcho.gif"))
+
+
+### Sahtú ----
+p.sahtu <- ggmap(sahtumap) +
+  geom_point(data = hotspots.sahtu.df, aes(x=x, y=y, group = seq_along(tod)), 
+             shape = 17, color = 'darkorange', show.legend = F) +
+  geom_point(data = sahtu, aes(x=x, y=y, group = id, color = id), show.legend = F) +
+  # geom_path(data = s.slave,
+  #           aes(x=x, y=y, group = id, color = id),
+  #           alpha = 0.3, show.legend = F) +
+  scale_color_viridis_d() 
+
+
+p.sahtu.anim <- p.sahtu +
+  transition_time(tod) +
+  shadow_mark(color = 'maroon', alpha = 0.25, exclude_layer = 5) +
+  exit_shrink() +
+  ease_aes('linear') +
+  labs(title="{frame_time}", x="Longitude", y="Latitude")
+
+num_frames <- length(unique(sahtu$tod))
+animate(p.sahtu.anim, nframes = num_frames, fps = 2)
+anim_save(file.path('anims', "sahtu.gif"))
+
+
 
 
 ### South Slave ----
+p.sslave <- ggmap(sslavemap) +
+  geom_point(data = hotspots.sslave.df, aes(x=x, y=y, group = seq_along(tod)), 
+             shape = 17, color = 'darkorange', show.legend = F) +
+  geom_point(data = s.slave, aes(x=x, y=y, group = id, color = id), show.legend = F) +
+  # geom_path(data = s.slave,
+  #           aes(x=x, y=y, group = id, color = id),
+  #           alpha = 0.3, show.legend = F) +
+  scale_color_viridis_d() 
+
+p.sslave.anim <- p.sslave +
+  transition_time(tod) +
+  #transition_states(tod) +
+  #shadow_wake(wake_length = 0.01, exclude_layer = c(2, 3)) +
+  shadow_mark(color = 'maroon', alpha = 0.25, exclude_layer = 5) +
+  #shadow_trail(distance = 0.01, exclude_layer = c(1)) + 
+  exit_shrink() +
+  ease_aes('linear') +
+  labs(title="{frame_time}", x="Longitude", y="Latitude")
+
+num_frames <- length(unique(s.slave$tod))
+animate(p.sslave.anim, nframes = num_frames, fps = 2)
+anim_save(file.path('anims', "sslave.gif"))
+
+
+######OLD######
 p.sslave <- ggmap(sslavemap) +
   #geom_polygon(data = progression.sslave, aes(group = datetime), fill = 'maroon', inherit.aes = F) +
   geom_point(data = s.slave, aes(x=x, y=y, group = id, color = id), show.legend = F) +
@@ -217,27 +266,7 @@ animate(p.sslave.anim, nframes = num_frames, fps = 2)
 anim_save(("sslave_test.gif"))
 length(unique(sslave$id))
 
+progression.sslave.prj <- st_transform(progression.sslave, crs.web)
 #geom_sf(data = progression.sslave, aes(group=tod), fill = 'maroon', color = 'maroon', inherit.aes = F) +
 #geom_point(data = hotspots.sslave.df, aes(x=x, y=y, group = seq_along(tod+1)), 
 #           shape = 17, color = 'maroon', show.legend = F) +
-progression.sslave.prj <- st_transform(progression.sslave, crs.web)
-p.sslave2 <- ggmap(sslavemap) +
-  geom_point(data = hotspots.sslave.df, aes(x=x, y=y, group = seq_along(tod)), 
-             shape = 17, color = 'darkorange', show.legend = F) +
-  geom_point(data = s.slave, aes(x=x, y=y, group = id, color = id), show.legend = F) +
-  # geom_path(data = s.slave,
-  #           aes(x=x, y=y, group = id, color = id),
-  #           alpha = 0.3, show.legend = F) +
-  scale_color_viridis_d() 
-
-p.sslave.anim2 <- p.sslave2 +
-  transition_time(tod) +
-  #transition_states(tod) +
-  #shadow_wake(wake_length = 0.01, exclude_layer = c(2, 3)) +
-  shadow_mark(color = 'maroon', alpha = 0.25, exclude_layer = 5) +
-  #shadow_trail(distance = 0.01, exclude_layer = c(1)) + 
-  exit_shrink() +
-  ease_aes('linear') +
-  labs(title="{frame_time}", x="Longitude", y="Latitude")
-animate(p.sslave.anim2, nframes = num_frames, fps = 2)
-anim_save(file.path('anims', "sslave.gif"))
