@@ -3,13 +3,15 @@
 # Started: 08 January 2024
 
 # need older `transformr`
-devtools::install_version("transformr", version = "0.1.3")
+#devtools::install_version("transformr", version = "0.1.3")
 
 require(data.table)
 require(sf)
 require(terra)
 require(tidyterra)
 require(dplyr)
+require(tidyr)
+require(amt)
 require(ggplot2)
 require(ggmap)
 #require(basemaps)
@@ -39,6 +41,14 @@ nwt <- filter(canPoly, PREABBR %in% c('N.W.T.'))
 nwt.wgs <- st_transform(nwt, crs)
 
 ## caribou ----
+fixrate <- cbou %>% make_track(x,y, timestamp, crs = crs, all_cols = T) %>% 
+  nest(data = -"id") %>% 
+  mutate(sr = lapply(data, summarize_sampling_rate)) %>%
+  dplyr::select(id, sr) %>% 
+  unnest(cols = c(sr))
+quantile(fixrate$median)
+# 8 hours
+
 # make a grouping variable for time of day
 cbou[,tod:=lubridate::ceiling_date(timestamp, unit = '8 hours')]
 
@@ -97,7 +107,7 @@ hotspots.sahtu.df <- setDT(sfheaders::sf_to_df(hotspots.sahtu, fill = T))
 hotspots.sslave.df <- setDT(sfheaders::sf_to_df(hotspots.sslave, fill = T))
 
 
-
+progression$tod <- lubridate::ceiling_date(progression$datetime, "8 hours")
 progression.sub <- filter(progression, datetime < as.POSIXct('2023-10-01', tz='UTC'))
 progression.sub$datetime <- as.POSIXct(paste0(as.character(progression.sub$DATE), ' 23:59:59'), tz = 'UTC', 
                                        format ='%Y%m%d %H:%M:%OS')
@@ -183,7 +193,6 @@ length(unique(dehcho$id))
 
 
 ### South Slave ----
-s.slave[,tod := lubridate::ceiling_date(timestamp, "8 hours")]
 p.sslave <- ggmap(sslavemap) +
   #geom_polygon(data = progression.sslave, aes(group = datetime), fill = 'maroon', inherit.aes = F) +
   geom_point(data = s.slave, aes(x=x, y=y, group = id, color = id), show.legend = F) +
@@ -211,7 +220,6 @@ length(unique(sslave$id))
 #geom_sf(data = progression.sslave, aes(group=tod), fill = 'maroon', color = 'maroon', inherit.aes = F) +
 #geom_point(data = hotspots.sslave.df, aes(x=x, y=y, group = seq_along(tod+1)), 
 #           shape = 17, color = 'maroon', show.legend = F) +
-progression.sslave$tod <- lubridate::ceiling_date(progression.sslave$datetime, "8 hours")
 progression.sslave.prj <- st_transform(progression.sslave, crs.web)
 p.sslave2 <- ggmap(sslavemap) +
   geom_point(data = hotspots.sslave.df, aes(x=x, y=y, group = seq_along(tod)), 
