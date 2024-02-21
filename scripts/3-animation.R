@@ -14,6 +14,7 @@ require(tidyr)
 require(amt)
 require(ggplot2)
 require(ggmap)
+require(ggspatial)
 #require(basemaps)
 require(gganimate)
 require(gifski)
@@ -50,7 +51,7 @@ quantile(fixrate$median)
 # 8 hours
 
 # make a grouping variable for time of day
-cbou[,tod:=lubridate::ceiling_date(timestamp, unit = '8 hours')]
+cbou[,tod:=lubridate::round_date(timestamp, unit = '8 hours')]
 
 cbou.MayOct <- cbou[timestamp>= as.POSIXct('2023-05-01', tz='UTC') & timestamp < as.POSIXct('2023-10-01', tz='UTC')]
 cbou.MayOct$datetime <- cbou.MayOct$timestamp
@@ -62,7 +63,7 @@ summary(cbou.MayOct$habitat)
 dehcho <- cbou.MayOct[study_area == 'dehcho']
 sahtu <- cbou.MayOct[study_area == 'sahtu']
 s.slave <- cbou.MayOct[study_area == 'south.slave']
-
+hayr <- cbou.MayOct[habitat == 'Hay River Lowlands']
 
 cbou.coords <- st_as_sf(cbou.MayOct, coords = c('x', 'y')) %>%
   st_set_crs(4326)
@@ -72,11 +73,14 @@ sahtu.coords <- st_as_sf(sahtu, coords = c('x', 'y')) %>%
   st_set_crs(4326)
 s.slave.coords <- st_as_sf(s.slave, coords = c('x', 'y')) %>%
   st_set_crs(4326)
+hayr.coords <- st_as_sf(hayr, coords = c('x', 'y')) %>%
+  st_set_crs(4326)
 
 cbou.ext <- st_bbox(cbou.coords)
 dehcho.ext <- st_bbox(dehcho.coords)
 sahtu.ext <- st_bbox(sahtu.coords)
 s.slave.ext <- st_bbox(s.slave.coords)
+hayr.ext <- st_bbox(hayr.coords)
 
 ## fires to bou area ----
 hotspots.sub <- hotspots[datetime < as.POSIXct('2023-10-01', tz='UTC')]
@@ -99,18 +103,24 @@ hotspots.sslave <- st_as_sf(hotspots.sub, coords = c('x', 'y')) %>%
   st_set_crs(4326) %>%
   st_crop(s.slave.ext)
 
+hotspots.hayr <- st_as_sf(hotspots.sub, coords = c('x', 'y')) %>%
+  st_set_crs(4326) %>%
+  st_crop(hayr.ext)
+
 
 
 hotspots.df <- setDT(sfheaders::sf_to_df(hotspots.bou, fill = T))
 hotspots.dehcho.df <- setDT(sfheaders::sf_to_df(hotspots.dehcho, fill = T))
 hotspots.sahtu.df <- setDT(sfheaders::sf_to_df(hotspots.sahtu, fill = T))
 hotspots.sslave.df <- setDT(sfheaders::sf_to_df(hotspots.sslave, fill = T))
+hotspots.hayr.df <- setDT(sfheaders::sf_to_df(hotspots.hayr, fill = T))
 
 
-progression$tod <- lubridate::ceiling_date(progression$datetime, "8 hours")
+
 progression.sub <- filter(progression, datetime < as.POSIXct('2023-10-01', tz='UTC'))
-progression.sub$datetime <- as.POSIXct(paste0(as.character(progression.sub$DATE), ' 23:59:59'), tz = 'UTC', 
-                                       format ='%Y%m%d %H:%M:%OS')
+progression.sub$datetime <- as.POSIXct(paste0(as.character(progression.sub$DATE), ' 23:59:59'), tz = 'UTC',
+                                      format ='%Y%m%d %H:%M:%OS')
+progression.sub$tod <- lubridate::ceiling_date(progression.sub$datetime, "8 hours")
 
 progression.bou <- progression.sub %>%
   st_crop(cbou.ext)
@@ -125,7 +135,8 @@ progression.sahtu <- progression.sub %>%
 progression.sslave <- progression.sub %>%
   st_crop(s.slave.ext)
 
-
+progression.hayr <- progression.sub %>%
+  st_crop(hayr.ext)
 
 # get baselayer ----
 myloc <- st_bbox(cbou.coords)
@@ -133,6 +144,7 @@ names(myloc) <- c('left', 'bottom', 'right', 'top')
 names(dehcho.ext) <- c('left', 'bottom', 'right', 'top')
 names(sahtu.ext) <- c('left', 'bottom', 'right', 'top')
 names(s.slave.ext) <- c('left', 'bottom', 'right', 'top')
+names(hayr.ext) <- c('left', 'bottom', 'right', 'top')
 
 # setting defaults outside of this b/c need an API from stadiamaps.com
 ## register_stadiamaps(key = "xxxxx")
@@ -144,6 +156,9 @@ sahtumap <- get_map(location = sahtu.ext, source = 'stadia', maptype = 'stamen_t
                      crop = FALSE, zoom = 8)
 sslavemap <- get_map(location = s.slave.ext, source = 'stadia', maptype = 'stamen_terrain', 
                      crop = FALSE, zoom = 9)
+
+hayrmap <- get_map(location = hayr.ext, source = 'stadia', maptype = 'stamen_terrain', 
+                    crop = FALSE, zoom = 10)
 
 ggplot() +
   geom_point(data = hotspots.df, aes(x=x, y=y, color = 'darkorange'), size = 0.3, show.legend = F) +
@@ -189,6 +204,8 @@ p.dehcho.anim <- p.dehcho +
 num_frames <- length(unique(dehcho$tod))
 animate(p.dehcho.anim, nframes = num_frames, fps = 2)
 anim_save(file.path('anims', "dehcho.gif"))
+animate(p.dehcho.anim, nframes = num_frames, fps = 2, renderer = ffmpeg_renderer())
+anim_save(file.path('anims', "dehcho.mp4"))
 
 
 ### Sahtú ----
@@ -212,7 +229,8 @@ p.sahtu.anim <- p.sahtu +
 num_frames <- length(unique(sahtu$tod))
 animate(p.sahtu.anim, nframes = num_frames, fps = 2)
 anim_save(file.path('anims', "sahtu.gif"))
-
+animate(p.sahtu.anim, nframes = num_frames, fps = 2, renderer = ffmpeg_renderer())
+anim_save(file.path('anims', "sahtu.mp4"))
 
 
 
@@ -239,7 +257,73 @@ p.sslave.anim <- p.sslave +
 num_frames <- length(unique(s.slave$tod))
 animate(p.sslave.anim, nframes = num_frames, fps = 2)
 anim_save(file.path('anims', "sslave.gif"))
+animate(p.sslave.anim, nframes = num_frames, fps = 2, renderer = ffmpeg_renderer())
+anim_save(file.path('anims', "sslave.mp4"))
 
+
+
+#### Enterprise fire - Hay River ----
+hotspots.hayr.Aug <- hotspots.hayr.df[datetime>= as.POSIXct('2023-08-01', tz='UTC')]
+hayr.Aug <- hayr[datetime>= as.POSIXct('2023-08-01', tz='UTC')]
+
+p.hayr <- ggmap(hayrmap) +
+  geom_point(data = hotspots.hayr.Aug, aes(x=x, y=y, group = seq_along(tod)), 
+             shape = 17, color = 'darkorange', show.legend = F) +
+  geom_point(data = hayr.Aug, aes(x=x, y=y, group = id, color = id), show.legend = F) +
+  # geom_path(data = s.slave,
+  #           aes(x=x, y=y, group = id, color = id),
+  #           alpha = 0.3, show.legend = F) +
+  # scalebar(location = "topright", dist = 4, dist_unit = "km",
+  #          transform = TRUE, model = "WGS84", x.min = ) +
+  annotation_scale(location = 'tl', width_hint = 0.3) +
+  coord_sf(crs = crs) + 
+  scale_color_viridis_d() 
+p.hayr
+
+p.hayr.anim <- p.hayr +
+  transition_time(tod) +
+  #transition_states(tod) +
+  #shadow_wake(wake_length = 0.01, exclude_layer = c(2, 3)) +
+  shadow_mark(color = 'maroon', alpha = 0.25, exclude_layer = 5) +
+  #shadow_trail(distance = 0.01, exclude_layer = c(1)) + 
+  exit_shrink() +
+  ease_aes('linear') +
+  labs(title="{frame_time}", x="Longitude", y="Latitude")
+
+num_frames <- length(unique(hayr.Aug$tod))
+animate(p.hayr.anim, nframes = num_frames, fps = 2)
+anim_save(file.path('anims', "hayr.gif"))
+animate(p.hayr.anim, nframes = num_frames, fps = 2, renderer = ffmpeg_renderer())
+anim_save(file.path('anims', "hayr.mp4"))
+
+
+
+
+progression.hayr.Aug <- filter(progression.hayr, datetime>= as.POSIXct('2023-08-01', tz='UTC'))
+p.hayr2 <- ggmap(hayrmap) +
+  geom_sf(data = progression.hayr.Aug, aes(group = seq_along(tod)), 
+          fill = 'maroon', color = 'maroon', inherit.aes = F) +
+  geom_point(data = hotspots.hayr.Aug, aes(x=x, y=y, group = seq_along(tod)), 
+             shape = 17, color = 'darkorange', show.legend = F) +
+  geom_point(data = hayr.Aug, aes(x=x, y=y, group = id, color = id), show.legend = F) +
+  # geom_path(data = hayr.Aug,
+  #           aes(x=x, y=y, group = id, color = id),
+  #           alpha = 0.3, show.legend = F) +
+  scale_color_viridis_d() +
+  annotation_scale(location = 'tl', width_hint = 0.3) +
+  coord_sf(crs=crs)
+p.hayr2
+
+p.hayr.anim2 <- p.hayr2 +
+  #transition_states(tod) +
+  transition_time(tod) +
+  shadow_wake(wake_length = 0.05) +
+  #shadow_trail(distance = 0.05) + 
+  #exit_shrink() +
+  ease_aes('linear') +
+  labs(title="{frame_time}", x="Longitude", y="Latitude")
+animate(p.hayr.anim2, nframes = num_frames, fps = 2)
+anim_save(file.path('anims', "hayr.gif"))
 
 ######OLD######
 p.sslave <- ggmap(sslavemap) +
