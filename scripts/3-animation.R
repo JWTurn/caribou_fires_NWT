@@ -44,9 +44,9 @@ nwt.wgs <- st_transform(nwt, crs)
 ## fires ----
 # 15km buffered enterprise fire
 enterprise.f <- burns %>%
+  filter(FIRENUM == 11345411) %>%
   st_buffer(dist = 15000) %>%
-  st_transform(crs = crs) %>%
-  filter(FIRENUM == 11345411)
+  st_transform(crs = crs) 
 plot(enterprise.f$geometry)
 
 ## caribou ----
@@ -101,7 +101,7 @@ hotspots.sub[, tod := lubridate::ceiling_date(datetime, unit = '8 hours')]
 hotspots.bou <- st_as_sf(hotspots.sub, coords = c('x', 'y')) %>%
   st_set_crs(4326) %>%
   st_crop(cbou.ext)
-plot(hotspots.bou$geometry)
+#plot(hotspots.bou$geometry)
 
 hotspots.dehcho <- st_as_sf(hotspots.sub, coords = c('x', 'y')) %>%
   st_set_crs(4326) %>%
@@ -136,7 +136,7 @@ progression.sub$tod <- lubridate::ceiling_date(progression.sub$datetime, "8 hour
 
 progression.bou <- progression.sub %>%
   st_crop(cbou.ext)
-plot(progression.bou$geometry)
+#plot(progression.bou$geometry)
 
 progression.dehcho <- progression.sub %>%
   st_crop(dehcho.ext)
@@ -171,6 +171,8 @@ sslavemap <- get_map(location = s.slave.ext, source = 'stadia', maptype = 'stame
 
 enterprisemap <- get_map(location = enterprise.ext, source = 'stadia', maptype = 'stamen_watercolor', 
                     crop = FALSE, zoom = 10)
+enterprisemap.bw <- get_map(location = enterprise.ext, source = 'stadia', maptype = 'stamen_toner_lite', 
+                         crop = FALSE, zoom = 10, color = 'bw')
 
 ggplot() +
   geom_point(data = hotspots.df, aes(x=x, y=y, color = 'darkorange'), size = 0.3, show.legend = F) +
@@ -277,6 +279,15 @@ anim_save(file.path('anims', "sslave.mp4"))
 #### Enterprise fire  ----
 hotspots.enterprise.Aug <- hotspots.enterprise.df[datetime>= as.POSIXct('2023-08-01', tz='UTC')]
 enterprise.Aug <- enterprise.df[datetime>= as.POSIXct('2023-08-01', tz='UTC')]
+tods <- unique(enterprise.Aug$tod)
+prog.hotspots.enterprise <- rbindlist(
+  lapply(tods, function(td){
+  sub <- hotspots.enterprise.Aug[tod<as.POSIXct(td,tz = 'UTC', format ='%Y%m%d %H:%M:%OS')]
+  sub[, tod2 := as.POSIXct(td,tz = 'UTC', format ='%Y%m%d %H:%M:%OS')]
+})
+)
+
+setnames(prog.hotspots.enterprise, old = c('tod', 'tod2'), new = c('tod.sing', 'tod'))
 
 p.enterprise <- ggmap(enterprisemap) +
   geom_point(data = hotspots.enterprise.Aug, aes(x=x, y=y, group = seq_along(tod)), 
@@ -285,8 +296,60 @@ p.enterprise <- ggmap(enterprisemap) +
   # geom_path(data = s.slave,
   #           aes(x=x, y=y, group = id, color = id),
   #           alpha = 0.3, show.legend = F) +
-  # scalebar(location = "topright", dist = 4, dist_unit = "km",
-  #          transform = TRUE, model = "WGS84", x.min = ) +
+  annotation_scale(location = 'tl', width_hint = 0.3) +
+  coord_sf(crs = crs) + 
+  scale_color_viridis_d() 
+
+
+p.enterprise.anim <- p.enterprise +
+  transition_time(tod) +
+  shadow_mark(color = 'maroon', alpha = 0.25, exclude_layer = 5) +
+  exit_shrink() +
+  ease_aes('linear') +
+  labs(title="{frame_time}", x="Longitude", y="Latitude")
+
+num_frames <- length(unique(enterprise.Aug$tod))
+animate(p.enterprise.anim, nframes = num_frames, fps = 2)
+anim_save(file.path('anims', "enterprise.gif"))
+animate(p.enterprise.anim, nframes = num_frames, fps = 2, renderer = ffmpeg_renderer())
+anim_save(file.path('anims', "enterprise.mp4"))
+
+p.enterprise2 <- ggmap(enterprisemap.bw) +
+  geom_point(data = prog.hotspots.enterprise, aes(x=x, y=y, group = seq_along(tod)), 
+             shape = 17, color = 'maroon', show.legend = F) +
+  geom_point(data = hotspots.enterprise.Aug, aes(x=x, y=y, group = seq_along(tod)), 
+             shape = 17, color = 'darkorange', show.legend = F) +
+  geom_point(data = enterprise.Aug, aes(x=x, y=y, group = id, color = id), show.legend = F) +
+  # geom_path(data = enterprise.Aug,
+  #           aes(x=x, y=y, group = id, color = id),
+  #           alpha = 0.3, show.legend = F) +
+  scale_color_viridis_d() +
+  annotation_scale(location = 'tl', width_hint = 0.3) +
+  coord_sf(crs=crs)
+p.enterprise2
+
+p.enterprise.anim2 <- p.enterprise2 +
+  #transition_states(tod) +
+  transition_time(tod) +
+  shadow_wake(wake_length = 0.05, exclude_layer = c(3,4)) +
+  #shadow_trail(distance = 0.03, exclude_layer = c(3,4)) + 
+  exit_shrink() +
+  ease_aes('linear') +
+  labs(title="{frame_time}", x="Longitude", y="Latitude")
+animate(p.enterprise.anim2, nframes = num_frames, fps = 2)
+anim_save(file.path('anims', "enterprise2.gif"))
+
+#####
+
+p.enterprise <- ggmap(enterprisemap) +
+  geom_point(data = hotspots.enterprise.Aug, aes(x=x, y=y, group = seq_along(tod)), 
+             shape = 17, color = 'maroon', show.legend = F) +
+  geom_point(data = hotspots.enterprise.Aug, aes(x=x, y=y, group = seq_along(tod)), 
+             shape = 17, color = 'darkorange', show.legend = F) +
+  geom_point(data = enterprise.Aug, aes(x=x, y=y, group = id, color = id), show.legend = F) +
+  # geom_path(data = s.slave,
+  #           aes(x=x, y=y, group = id, color = id),
+  #           alpha = 0.3, show.legend = F) +
   annotation_scale(location = 'tl', width_hint = 0.3) +
   coord_sf(crs = crs) + 
   scale_color_viridis_d() 
@@ -295,8 +358,8 @@ p.enterprise
 p.enterprise.anim <- p.enterprise +
   transition_time(tod) +
   #transition_states(tod) +
-  #shadow_wake(wake_length = 0.01, exclude_layer = c(2, 3)) +
-  shadow_mark(color = 'maroon', alpha = 0.25, exclude_layer = 5) +
+  shadow_wake(wake_length = 0.01, exclude_layer = c(2, 3)) +
+  #shadow_mark(color = 'maroon', alpha = 0.25, exclude_layer = 5) +
   #shadow_trail(distance = 0.01, exclude_layer = c(1)) + 
   exit_shrink() +
   ease_aes('linear') +
@@ -312,7 +375,7 @@ anim_save(file.path('anims', "enterprise.mp4"))
 
 
 progression.enterprise.Aug <- filter(progression.enterprise, datetime>= as.POSIXct('2023-08-01', tz='UTC'))
-p.enterprise2 <- ggmap(enterprisemap) +
+p.enterprise2 <- ggmap(enterprisemap.bw) +
   geom_sf(data = progression.enterprise.Aug, aes(group = seq_along(tod)), 
           fill = 'maroon', color = 'maroon', inherit.aes = F) +
   geom_point(data = hotspots.enterprise.Aug, aes(x=x, y=y, group = seq_along(tod)), 
@@ -329,8 +392,8 @@ p.enterprise2
 p.enterprise.anim2 <- p.enterprise2 +
   #transition_states(tod) +
   transition_time(tod) +
-  shadow_wake(wake_length = 0.05) +
-  #shadow_trail(distance = 0.05) + 
+  #shadow_wake(wake_length = 0.05) +
+  shadow_trail(distance = 0.05) + 
   #exit_shrink() +
   ease_aes('linear') +
   labs(title="{frame_time}", x="Longitude", y="Latitude")
