@@ -128,7 +128,7 @@ hotspots.sslave.df <- setDT(sfheaders::sf_to_df(hotspots.sslave, fill = T))
 hotspots.enterprise.df <- setDT(sfheaders::sf_to_df(hotspots.enterprise, fill = T))
 
 
-
+# Don't neeed these currently
 progression.sub <- filter(progression, datetime < as.POSIXct('2023-10-01', tz='UTC'))
 progression.sub$datetime <- as.POSIXct(paste0(as.character(progression.sub$DATE), ' 23:59:59'), tz = 'UTC',
                                       format ='%Y%m%d %H:%M:%OS')
@@ -160,20 +160,21 @@ names(enterprise.ext) <- c('left', 'bottom', 'right', 'top')
 
 # setting defaults outside of this b/c need an API from stadiamaps.com
 ## register_stadiamaps(key = "xxxxx")
-nwtmap <- get_map(location = myloc, source = 'stadia', maptype = 'stamen_terrain', 
-                  crop = FALSE, zoom = 6)
-dehchomap <- get_map(location = dehcho.ext, source = 'stadia', maptype = 'stamen_terrain', 
+
+# nwtmap <- get_map(location = myloc, source = 'stadia', maptype = 'stamen_toner_lite', 
+#                   crop = FALSE, zoom = 6)
+dehchomap <- get_map(location = dehcho.ext, source = 'stadia', maptype = 'stamen_toner_lite', 
                   crop = FALSE, zoom = 8)
-sahtumap <- get_map(location = sahtu.ext, source = 'stadia', maptype = 'stamen_terrain', 
+sahtumap <- get_map(location = sahtu.ext, source = 'stadia', maptype = 'stamen_toner_lite', 
                      crop = FALSE, zoom = 8)
-sslavemap <- get_map(location = s.slave.ext, source = 'stadia', maptype = 'stamen_terrain', 
+sslavemap <- get_map(location = s.slave.ext, source = 'stadia', maptype = 'stamen_toner_lite', 
                      crop = FALSE, zoom = 9)
 
-enterprisemap <- get_map(location = enterprise.ext, source = 'stadia', maptype = 'stamen_watercolor', 
+enterprisemap <- get_map(location = enterprise.ext, source = 'stadia', maptype = 'stamen_toner_lite', 
                     crop = FALSE, zoom = 10)
-enterprisemap.bw <- get_map(location = enterprise.ext, source = 'stadia', maptype = 'stamen_toner_lite', 
-                         crop = FALSE, zoom = 10, color = 'bw')
 
+
+### whole NWT ----
 ggplot() +
   geom_point(data = hotspots.df, aes(x=x, y=y, color = 'darkorange'), size = 0.3, show.legend = F) +
   geom_sf(data = progression) 
@@ -201,10 +202,10 @@ animate(p.anim, nframes = num_frames)
 p.dehcho <- ggmap(dehchomap) +
   geom_point(data = hotspots.dehcho.df, aes(x=x, y=y, group = seq_along(tod)), 
              shape = 17, color = 'darkorange', show.legend = F) +
-  geom_point(data = dehcho, aes(x=x, y=y, group = id, color = id), show.legend = F) +
-  # geom_path(data = s.slave,
-  #           aes(x=x, y=y, group = id, color = id),
-  #           alpha = 0.3, show.legend = F) +
+  geom_point(data = dehcho, aes(x=x, y=y, group = id, color = id), 
+             size = 2.25, show.legend = F) +
+  annotation_scale(location = 'tl', width_hint = 0.3) +
+  coord_sf(crs = crs) + 
   scale_color_viridis_d() 
 
 
@@ -226,10 +227,10 @@ anim_save(file.path('anims', "dehcho.mp4"))
 p.sahtu <- ggmap(sahtumap) +
   geom_point(data = hotspots.sahtu.df, aes(x=x, y=y, group = seq_along(tod)), 
              shape = 17, color = 'darkorange', show.legend = F) +
-  geom_point(data = sahtu, aes(x=x, y=y, group = id, color = id), show.legend = F) +
-  # geom_path(data = s.slave,
-  #           aes(x=x, y=y, group = id, color = id),
-  #           alpha = 0.3, show.legend = F) +
+  geom_point(data = sahtu, aes(x=x, y=y, group = id, color = id), 
+             size = 2.25, show.legend = F) +
+  annotation_scale(location = 'tl', width_hint = 0.3) +
+  coord_sf(crs = crs) + 
   scale_color_viridis_d() 
 
 
@@ -252,18 +253,16 @@ anim_save(file.path('anims', "sahtu.mp4"))
 p.sslave <- ggmap(sslavemap) +
   geom_point(data = hotspots.sslave.df, aes(x=x, y=y, group = seq_along(tod)), 
              shape = 17, color = 'darkorange', show.legend = F) +
-  geom_point(data = s.slave, aes(x=x, y=y, group = id, color = id), show.legend = F) +
-  # geom_path(data = s.slave,
-  #           aes(x=x, y=y, group = id, color = id),
-  #           alpha = 0.3, show.legend = F) +
+  geom_point(data = s.slave, aes(x=x, y=y, group = id, color = id), 
+             size = 2.25, show.legend = F) +
+  annotation_scale(location = 'tl', width_hint = 0.3) +
+  coord_sf(crs = crs) + 
   scale_color_viridis_d() 
+
 
 p.sslave.anim <- p.sslave +
   transition_time(tod) +
-  #transition_states(tod) +
-  #shadow_wake(wake_length = 0.01, exclude_layer = c(2, 3)) +
   shadow_mark(color = 'maroon', alpha = 0.25, exclude_layer = 5) +
-  #shadow_trail(distance = 0.01, exclude_layer = c(1)) + 
   exit_shrink() +
   ease_aes('linear') +
   labs(title="{frame_time}", x="Longitude", y="Latitude")
@@ -279,20 +278,12 @@ anim_save(file.path('anims', "sslave.mp4"))
 #### Enterprise fire  ----
 hotspots.enterprise.Aug <- hotspots.enterprise.df[datetime>= as.POSIXct('2023-08-01', tz='UTC')]
 enterprise.Aug <- enterprise.df[datetime>= as.POSIXct('2023-08-01', tz='UTC')]
-tods <- unique(enterprise.Aug$tod)
-prog.hotspots.enterprise <- rbindlist(
-  lapply(tods, function(td){
-  sub <- hotspots.enterprise.Aug[tod<as.POSIXct(td,tz = 'UTC', format ='%Y%m%d %H:%M:%OS')]
-  sub[, tod2 := as.POSIXct(td,tz = 'UTC', format ='%Y%m%d %H:%M:%OS')]
-})
-)
-
-setnames(prog.hotspots.enterprise, old = c('tod', 'tod2'), new = c('tod.sing', 'tod'))
 
 p.enterprise <- ggmap(enterprisemap) +
   geom_point(data = hotspots.enterprise.Aug, aes(x=x, y=y, group = seq_along(tod)), 
              shape = 17, color = 'darkorange', show.legend = F) +
-  geom_point(data = enterprise.Aug, aes(x=x, y=y, group = id, color = id), show.legend = F) +
+  geom_point(data = enterprise.Aug, aes(x=x, y=y, group = id, color = id), 
+             size = 2.25, show.legend = F) +
   # geom_path(data = s.slave,
   #           aes(x=x, y=y, group = id, color = id),
   #           alpha = 0.3, show.legend = F) +
@@ -314,12 +305,26 @@ anim_save(file.path('anims', "enterprise.gif"))
 animate(p.enterprise.anim, nframes = num_frames, fps = 2, renderer = ffmpeg_renderer())
 anim_save(file.path('anims', "enterprise.mp4"))
 
-p.enterprise2 <- ggmap(enterprisemap.bw) +
+
+
+#####
+tods <- unique(enterprise.Aug$tod)
+prog.hotspots.enterprise <- rbindlist(
+  lapply(tods, function(td){
+    sub <- hotspots.enterprise.Aug[tod<as.POSIXct(td,tz = 'UTC', format ='%Y%m%d %H:%M:%OS')]
+    sub[, tod2 := as.POSIXct(td,tz = 'UTC', format ='%Y%m%d %H:%M:%OS')]
+  })
+)
+
+setnames(prog.hotspots.enterprise, old = c('tod', 'tod2'), new = c('tod.sing', 'tod'))
+
+p.enterprise2 <- ggmap(enterprisemap) +
   geom_point(data = prog.hotspots.enterprise, aes(x=x, y=y, group = seq_along(tod)), 
              shape = 17, color = 'maroon', show.legend = F) +
   geom_point(data = hotspots.enterprise.Aug, aes(x=x, y=y, group = seq_along(tod)), 
              shape = 17, color = 'darkorange', show.legend = F) +
-  geom_point(data = enterprise.Aug, aes(x=x, y=y, group = id, color = id), show.legend = F) +
+  geom_point(data = enterprise.Aug, aes(x=x, y=y, group = id, color = id), 
+             size = 2.25, show.legend = F) +
   # geom_path(data = enterprise.Aug,
   #           aes(x=x, y=y, group = id, color = id),
   #           alpha = 0.3, show.legend = F) +
@@ -339,7 +344,7 @@ p.enterprise.anim2 <- p.enterprise2 +
 animate(p.enterprise.anim2, nframes = num_frames, fps = 2)
 anim_save(file.path('anims', "enterprise2.gif"))
 
-#####
+
 
 p.enterprise <- ggmap(enterprisemap) +
   geom_point(data = hotspots.enterprise.Aug, aes(x=x, y=y, group = seq_along(tod)), 
