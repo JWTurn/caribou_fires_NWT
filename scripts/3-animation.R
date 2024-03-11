@@ -243,29 +243,6 @@ sahtuzoommap <- get_map(location = sahtuzoom.ext, source = 'stadia', maptype = '
                          crop = FALSE, zoom = 10)
 
 
-### whole NWT ----
-ggplot() +
-  geom_point(data = hotspots.df, aes(x=x, y=y, color = 'darkorange'), size = 0.3, show.legend = F) +
-  geom_sf(data = progression) 
-
-p.data <- ggmap(nwtmap) +
-  geom_point(data = cbou.MayOct, aes(x=x, y=y, group = id, color = id), show.legend = F) +
-  # geom_path(data = cbou.MayOct, 
-  #           aes(x=x, y=y, group = id, color = id), 
-  #           alpha = 0.3, show.legend = F) +
-  geom_point(data = hotspots.df, aes(x=x, y=y), shape = 17, color = 'darkorange', show.legend = F) +
-  scale_color_viridis_d()
-p.data
-
-p.anim <- p.data +
-  transition_time(datetime) +
-  shadow_trail(distance = 0.01) + 
-  ease_aes('linear') +
-  labs(title="{frame_time}", x="Longitude", y="Latitude")
-
-#num_frames <- length(unique(cbou.MayOct$datetime))
-num_frames <- as.integer(as.POSIXct('2023-10-01', tz='UTC') - as.POSIXct('2023-05-01', tz='UTC'))*3
-animate(p.anim, nframes = num_frames)
 
 ### Dehcho ----
 p.dehcho <- ggmap(dehchomap) +
@@ -281,8 +258,7 @@ dehcho.web <- dehcho.coords %>% st_transform(crs.web)
 hotspots.dehcho.web <- setDT(hotspots.dehcho %>% 
                                st_transform(crs.web) %>%
                                sfheaders::sf_to_df(fill = T))
-basemap_ggplot(ext = dehcho.web, map_service = 'osm', map_type = 'topographic')
-# 
+
 p.dehcho <-
  # ggplot() + #annotation_map_tile() +
   basemap_ggplot(ext = dehcho.web, map_service = 'osm', map_type = 'topographic') +
@@ -349,13 +325,30 @@ p.sahtu <- ggmap(sahtumap) +
   coord_sf(crs = crs) + 
   scale_color_viridis_d() 
 
+sahtu.web <- sahtu.coords %>% st_transform(crs.web)
+hotspots.sahtu.web <- setDT(hotspots.sahtu %>% 
+                               st_transform(crs.web) %>%
+                               sfheaders::sf_to_df(fill = T))
+
+p.sahtu <-
+  basemap_ggplot(ext = sahtu.web, map_service = 'osm', map_type = 'topographic') +
+  geom_point(data = hotspots.sahtu.web, aes(x=x, y=y, group = seq_along(tod)),
+             shape = 17, color = 'darkorange', show.legend = F) +
+  geom_point(data = sahtu.df, aes(x=x, y=y, group = id, color = id),
+             size = 2.25, show.legend = F) +
+  annotation_scale(location = 'tl', width_hint = 0.3) +
+  theme_bw() +
+  #coord_sf(crs = crs) +
+  scale_color_viridis_d(option = 'mako')
+p.sahtu
 
 p.sahtu.anim <- p.sahtu +
   transition_time(tod) +
-  shadow_mark(color = 'maroon', alpha = 0.25, exclude_layer = 5) +
+  shadow_mark(color = 'maroon', alpha = 0.25, exclude_layer = 3) + # 5 for ggmap
   exit_shrink() +
   ease_aes('linear') +
   labs(title="{frame_time}", x="Longitude", y="Latitude")
+
 
 num_frames <- length(unique(sahtu$tod))
 animate(p.sahtu.anim, nframes = num_frames, fps = 2)
@@ -363,7 +356,7 @@ anim_save(file.path('anims', "sahtu.gif"))
 animate(p.sahtu.anim, nframes = num_frames, fps = 2, renderer = ffmpeg_renderer())
 anim_save(file.path('anims', "sahtu.mp4"))
 
-#### dehcho zoom ----
+#### sahtu zoom ----
 hotspots.sahtuzoom.Jul <- hotspots.sahtuzoom.df[datetime %between% c(as.POSIXct('2023-07-01', tz='UTC'),
                                                 as.POSIXct('2023-08-01', tz='UTC'))]
 sahtuzoom.Jul <- sahtuzoom.df[datetime %between% c(as.POSIXct('2023-07-01', tz='UTC'),
@@ -378,13 +371,13 @@ p.sahtuzoom <- ggmap(sahtuzoommap) +
   coord_sf(crs = crs) + 
   scale_color_viridis_d() 
 
-
 p.sahtuzoom.anim <- p.sahtuzoom +
   transition_time(tod) +
   shadow_mark(color = 'maroon', alpha = 0.25, exclude_layer = 5) +
   exit_shrink() +
   ease_aes('linear') +
   labs(title="{frame_time}", x="Longitude", y="Latitude")
+
 
 num_frames <- length(unique(sahtuzoom.Jul$tod))
 animate(p.sahtuzoom.anim, nframes = num_frames, fps = 2)
@@ -402,13 +395,29 @@ p.sslave <- ggmap(sslavemap) +
   coord_sf(crs = crs) + 
   scale_color_viridis_d() 
 
+sslave.web <- s.slave.coords %>% st_transform(crs.web)
+hotspots.sslave.web <- setDT(hotspots.sslave %>% 
+                               st_transform(crs.web) %>%
+                               sfheaders::sf_to_df(fill = T))
+
+p.sslave <- basemap_ggplot(ext = sslave.web, map_service = 'osm', map_type = 'topographic') +
+  geom_point(data = hotspots.sslave.web, aes(x=x, y=y, group = seq_along(tod)),
+             shape = 17, color = 'darkorange', show.legend = F) +
+  geom_point(data = sslave.df, aes(x=x, y=y, group = id, color = id),
+             size = 2.25, show.legend = F) +
+  annotation_scale(location = 'tl', width_hint = 0.3) +
+  theme_bw() +
+  #coord_sf(crs = crs) +
+  scale_color_viridis_d(option = 'mako')
+p.sslave
 
 p.sslave.anim <- p.sslave +
   transition_time(tod) +
-  shadow_mark(color = 'maroon', alpha = 0.25, exclude_layer = 5) +
+  shadow_mark(color = 'maroon', alpha = 0.25, exclude_layer = 3) + # 5 for ggmap
   exit_shrink() +
   ease_aes('linear') +
   labs(title="{frame_time}", x="Longitude", y="Latitude")
+
 
 num_frames <- length(unique(s.slave$tod))
 animate(p.sslave.anim, nframes = num_frames, fps = 2)
