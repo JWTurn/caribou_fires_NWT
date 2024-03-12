@@ -1,7 +1,8 @@
-### Fires and Caribou ====
+# Fires and Caribou animations ====
 # Julie Turner
 # Started: 08 January 2024
 
+## load packages ----
 # need older `transformr`
 #devtools::install_version("transformr", version = "0.1.3")
 
@@ -23,8 +24,10 @@ require(gifski)
 raw <- file.path('data', 'raw')
 derived <- file.path('data', 'derived')
 
+# downloaded data from movebank
 cbou <- readRDS(file.path(raw, 'NWTdat.RDS'))
 
+# prepared fires data
 hotspots <- readRDS(file.path(raw, 'hotspots2023_nwt.RDS'))
 
 progression <- st_read(file.path(raw, 'progression_nwt.shp'))
@@ -32,12 +35,12 @@ burns <- st_read(file.path(raw, 'FireShapefiles', 'brnGEE_2023_Merge.shp'))
 
 
 # prep ----
-# pseudo mercator
+# pseudo mercator for web maps (needed for `basemaps` baselayers)
 crs.web <- st_crs(3857)$wkt
 crs <- st_crs(4326)$wkt
 
 
-## fires ----
+## focal fires ----
 # 15km buffered enterprise fire
 enterprise.f <- burns %>%
   filter(FIRENUM == 11345411) %>%
@@ -60,6 +63,7 @@ sahtuzoom.f <- burns %>%
 plot(sahtuzoom.f$geometry)
 
 ## caribou ----
+# double checking fixrate so can chose how to align timings
 fixrate <- cbou %>% make_track(x,y, timestamp, crs = crs, all_cols = T) %>% 
   nest(data = -"id") %>% 
   mutate(sr = lapply(data, summarize_sampling_rate)) %>%
@@ -68,26 +72,33 @@ fixrate <- cbou %>% make_track(x,y, timestamp, crs = crs, all_cols = T) %>%
 quantile(fixrate$median)
 # 8 hours
 
-# make a grouping variable for time of day
+# make a grouping variable for time of day to align timings for animations
 cbou[,tod:=lubridate::round_date(timestamp, unit = '8 hours')]
 
+# limit caribou data to "fire season"
 cbou.MayOct <- cbou[timestamp>= as.POSIXct('2023-05-01', tz='UTC') & timestamp < as.POSIXct('2023-10-01', tz='UTC')]
+# create common datetime label across data
 cbou.MayOct$datetime <- cbou.MayOct$timestamp
+
+# take a quick look
 ggplot() +
   geom_point(data = cbou.MayOct, aes(x=x, y=y), color = 'purple', show.legend = F) 
 
+# just checking out how many points per study herd at this point
 summary(cbou.MayOct$habitat)
 
+## prepare data for mapping ----
+# sub datasets for each study area
 dehcho <- cbou.MayOct[study_area == 'dehcho']
 sahtu <- cbou.MayOct[study_area == 'sahtu']
 s.slave <- cbou.MayOct[study_area == 'south.slave']
 
 
+# create study area coords to define extents and make dfs for mapping
 cbou.coords <- st_as_sf(cbou.MayOct, coords = c('x', 'y')) %>%
   st_set_crs(4326) 
 
 cbou.coords.df <- setDT(cbou.coords %>%
-  st_transform(crs.web) %>%
   sfheaders::sf_to_df(fill = T))
 
 
@@ -95,25 +106,23 @@ dehcho.coords <- st_as_sf(dehcho, coords = c('x', 'y')) %>%
   st_set_crs(4326)
 
 dehcho.df <- setDT(dehcho.coords %>%
-                          st_transform(crs.web) %>%
-                          sfheaders::sf_to_df(fill = T))
+                   sfheaders::sf_to_df(fill = T))
 
 
 sahtu.coords <- st_as_sf(sahtu, coords = c('x', 'y')) %>%
   st_set_crs(4326) 
 
 sahtu.df <- setDT(sahtu.coords %>% 
-                   st_transform(crs.web) %>%
                      sfheaders::sf_to_df(fill = T))
 
 s.slave.coords <- st_as_sf(s.slave, coords = c('x', 'y')) %>%
   st_set_crs(4326) 
 
 sslave.df <- setDT(s.slave.coords %>%
-                     st_transform(crs.web) %>%
                      sfheaders::sf_to_df(fill = T))
 
-# gps points within 15km of the zoomed in fire
+# caribou gps points within 15km of the zoomed in fire to define area
+# also creating with web crs
 enterprise <- cbou.coords %>%
   st_join(enterprise.f, join = st_within) %>%
   filter(!is.na(FIRENUM))
@@ -138,6 +147,7 @@ sahtuzoom.df.web <- setDT(sahtuzoom %>%
                              st_transform(crs.web) %>%
                              sfheaders::sf_to_df(fill = T))
 
+## now finally defining the extents
 cbou.ext <- st_bbox(cbou.coords)
 dehcho.ext <- st_bbox(dehcho.coords)
 sahtu.ext <- st_bbox(sahtu.coords)
@@ -146,14 +156,16 @@ enterprise.ext <- st_bbox(enterprise.f)
 dehchozoom.ext <- st_bbox(dehchozoom.f)
 sahtuzoom.ext <- st_bbox(sahtuzoom.f)
 
-## fires to bou area ----
+## subset fires data to areas with caribou ----
+# ignore fires after October
 hotspots.sub <- hotspots[datetime < as.POSIXct('2023-10-01', tz='UTC')]
-# make a grouping variable for time of day
+
+# make a grouping variable for time of day to align for animations
 hotspots.sub[, tod := lubridate::ceiling_date(datetime, unit = '8 hours')]
 hotspots.bou <- st_as_sf(hotspots.sub, coords = c('x', 'y')) %>%
   st_set_crs(4326) %>%
   st_crop(cbou.ext)
-#plot(hotspots.bou$geometry)
+
 
 hotspots.dehcho <- st_as_sf(hotspots.sub, coords = c('x', 'y')) %>%
   st_set_crs(4326) %>%
@@ -181,7 +193,7 @@ hotspots.sahtuzoom <- st_as_sf(hotspots.sub, coords = c('x', 'y')) %>%
 
 
 
-
+# turn sf objects into dataframes for easier plotting
 hotspots.df <- setDT(sfheaders::sf_to_df(hotspots.bou, fill = T))
 hotspots.dehcho.df <- setDT(sfheaders::sf_to_df(hotspots.dehcho, fill = T))
 hotspots.sahtu.df <- setDT(sfheaders::sf_to_df(hotspots.sahtu, fill = T))
@@ -190,7 +202,8 @@ hotspots.enterprise.df <- setDT(sfheaders::sf_to_df(hotspots.enterprise, fill = 
 hotspots.dehchozoom.df <- setDT(sfheaders::sf_to_df(hotspots.dehchozoom, fill = T))
 hotspots.sahtuzoom.df <- setDT(sfheaders::sf_to_df(hotspots.sahtuzoom, fill = T))
 
-# Don't need these currently
+
+## Not using the progressions currently about leaving the prep here in case we change our minds
 progression.sub <- filter(progression, datetime < as.POSIXct('2023-10-01', tz='UTC'))
 progression.sub$datetime <- as.POSIXct(paste0(as.character(progression.sub$DATE), ' 23:59:59'), tz = 'UTC',
                                       format ='%Y%m%d %H:%M:%OS')
@@ -199,7 +212,7 @@ progression.sub$tod <- lubridate::ceiling_date(progression.sub$datetime, "8 hour
 progression.bou <- progression.sub %>%
   st_transform(crs.web) %>%
   st_crop(cbou.ext)
-#plot(progression.bou$geometry)
+
 
 progression.dehcho <- progression.sub %>%
   st_crop(dehcho.ext)
@@ -214,6 +227,7 @@ progression.enterprise <- progression.sub %>%
   st_crop(enterprise.ext)
 
 # get baselayer ----
+## if using ggmap baselayers, need to change labels on extents
 myloc <- st_bbox(cbou.coords)
 names(myloc) <- c('left', 'bottom', 'right', 'top')
 names(dehcho.ext) <- c('left', 'bottom', 'right', 'top')
@@ -223,11 +237,10 @@ names(enterprise.ext) <- c('left', 'bottom', 'right', 'top')
 names(dehchozoom.ext) <- c('left', 'bottom', 'right', 'top')
 names(sahtuzoom.ext) <- c('left', 'bottom', 'right', 'top')
 
-# setting defaults outside of this b/c need an API from stadiamaps.com
+# setting defaults outside of this script b/c need an API from stadiamaps.com -- don't share personal info
+## stadia maps are free, but most free maps are starting to need APIs
 ## register_stadiamaps(key = "xxxxx")
 
-# nwtmap <- get_map(location = myloc, source = 'stadia', maptype = 'stamen_toner_lite', 
-#                   crop = FALSE, zoom = 6)
 dehchomap <- get_map(location = dehcho.ext, source = 'stadia', maptype = 'stamen_terrain_background', 
                   crop = FALSE, zoom = 8)
 sahtumap <- get_map(location = sahtu.ext, source = 'stadia', maptype = 'stamen_terrain_background', 
@@ -245,6 +258,7 @@ sahtuzoommap <- get_map(location = sahtuzoom.ext, source = 'stadia', maptype = '
 
 
 ### Dehcho ----
+# option for `ggmap` baselayer
 p.dehcho <- ggmap(dehchomap) +
   geom_point(data = hotspots.dehcho.df, aes(x=x, y=y, group = seq_along(tod)), 
              shape = 17, color = 'darkorange', show.legend = F) +
@@ -254,39 +268,43 @@ p.dehcho <- ggmap(dehchomap) +
   coord_sf(crs = crs) + 
   scale_color_viridis_d(option = 'mako') 
 
+# option for `basemap` baselayer
 dehcho.web <- dehcho.coords %>% st_transform(crs.web)
 hotspots.dehcho.web <- setDT(hotspots.dehcho %>% 
                                st_transform(crs.web) %>%
                                sfheaders::sf_to_df(fill = T))
 
-p.dehcho <-
- # ggplot() + #annotation_map_tile() +
-  basemap_ggplot(ext = dehcho.web, map_service = 'osm', map_type = 'topographic') +
-  #basemap_gglayer(ext = dehcho.web, map_service = 'osm', map_type = 'topographic') +
+p.dehcho <- basemap_ggplot(ext = dehcho.web, map_service = 'osm', map_type = 'topographic') +
   geom_point(data = hotspots.dehcho.web, aes(x=x, y=y, group = seq_along(tod)),
              shape = 17, color = 'darkorange', show.legend = F) +
   geom_point(data = dehcho.df, aes(x=x, y=y, group = id, color = id),
              size = 2.25, show.legend = F) +
   annotation_scale(location = 'tl', width_hint = 0.3) +
   theme_bw() +
-  #coord_sf(crs = crs) +
   scale_color_viridis_d(option = 'mako')
 p.dehcho
 
+# animation based on either option
 p.dehcho.anim <- p.dehcho +
   transition_time(tod) +
-  shadow_mark(color = 'maroon', alpha = 0.25, exclude_layer = 3) + # 5 for ggmap
+  # create aftermark of hotspots only
+  shadow_mark(color = 'maroon', alpha = 0.25, exclude_layer = 3) + # layer 5 for ggmap
+  # shrinking trail as points disappear
   exit_shrink() +
+  # makes animations smoother
   ease_aes('linear') +
   labs(title="{frame_time}", x="Longitude", y="Latitude")
 
 num_frames <- length(unique(dehcho$tod))
+# animates as gif
 animate(p.dehcho.anim, nframes = num_frames, fps = 2)
 anim_save(file.path('anims', "dehcho.gif"))
+# animate as mp4
 animate(p.dehcho.anim, nframes = num_frames, fps = 2, renderer = ffmpeg_renderer())
 anim_save(file.path('anims', "dehcho.mp4"))
 
 #### dehcho zoom ----
+# filter to right timer period for the specific fire
 hotspots.dehchozoom.Aug <- hotspots.dehchozoom.df[datetime >= as.POSIXct('2023-07-01', tz='UTC')]
 dehchozoom.Aug <- dehchozoom.df[datetime>= as.POSIXct('2023-08-01', tz='UTC')]
 
@@ -308,14 +326,17 @@ p.dehchozoom.anim <- p.dehchozoom +
   labs(title="{frame_time}", x="Longitude", y="Latitude")
 
 num_frames <- length(unique(dehchozoom.Aug$tod))
+# animate gif
 animate(p.dehchozoom.anim, nframes = num_frames, fps = 2)
 anim_save(file.path('anims', "dehchozoom.gif"))
+# animate mp4
 animate(p.dehchozoom.anim, nframes = num_frames, fps = 2, renderer = ffmpeg_renderer())
 anim_save(file.path('anims', "dehchozoom.mp4"))
 
 
 
 ### Sahtú ----
+# option for `ggmap` baselayer
 p.sahtu <- ggmap(sahtumap) +
   geom_point(data = hotspots.sahtu.df, aes(x=x, y=y, group = seq_along(tod)), 
              shape = 17, color = 'darkorange', show.legend = F) +
@@ -325,6 +346,7 @@ p.sahtu <- ggmap(sahtumap) +
   coord_sf(crs = crs) + 
   scale_color_viridis_d() 
 
+# option for `basemap` baselayer
 sahtu.web <- sahtu.coords %>% st_transform(crs.web)
 hotspots.sahtu.web <- setDT(hotspots.sahtu %>% 
                                st_transform(crs.web) %>%
@@ -342,21 +364,25 @@ p.sahtu <-
   scale_color_viridis_d(option = 'mako')
 p.sahtu
 
+# animation depending which option chosen
 p.sahtu.anim <- p.sahtu +
   transition_time(tod) +
-  shadow_mark(color = 'maroon', alpha = 0.25, exclude_layer = 3) + # 5 for ggmap
+  shadow_mark(color = 'maroon', alpha = 0.25, exclude_layer = 3) + # layer 5 for ggmap
   exit_shrink() +
   ease_aes('linear') +
   labs(title="{frame_time}", x="Longitude", y="Latitude")
 
 
 num_frames <- length(unique(sahtu$tod))
+# animate gif
 animate(p.sahtu.anim, nframes = num_frames, fps = 2)
 anim_save(file.path('anims', "sahtu.gif"))
+# animate mp4
 animate(p.sahtu.anim, nframes = num_frames, fps = 2, renderer = ffmpeg_renderer())
 anim_save(file.path('anims', "sahtu.mp4"))
 
 #### sahtu zoom ----
+# filter to time frame relevant for specfic fire
 hotspots.sahtuzoom.Jul <- hotspots.sahtuzoom.df[datetime %between% c(as.POSIXct('2023-07-01', tz='UTC'),
                                                 as.POSIXct('2023-08-01', tz='UTC'))]
 sahtuzoom.Jul <- sahtuzoom.df[datetime %between% c(as.POSIXct('2023-07-01', tz='UTC'),
@@ -380,12 +406,15 @@ p.sahtuzoom.anim <- p.sahtuzoom +
 
 
 num_frames <- length(unique(sahtuzoom.Jul$tod))
+# animate gif
 animate(p.sahtuzoom.anim, nframes = num_frames, fps = 2)
 anim_save(file.path('anims', "sahtuzoom.gif"))
+# animate mp4
 animate(p.sahtuzoom.anim, nframes = num_frames, fps = 2, renderer = ffmpeg_renderer())
 anim_save(file.path('anims', "sahtuzoom.mp4"))
 
 ### South Slave ----
+# option for `ggmap` baselayer
 p.sslave <- ggmap(sslavemap) +
   geom_point(data = hotspots.sslave.df, aes(x=x, y=y, group = seq_along(tod)), 
              shape = 17, color = 'darkorange', show.legend = F) +
@@ -395,6 +424,7 @@ p.sslave <- ggmap(sslavemap) +
   coord_sf(crs = crs) + 
   scale_color_viridis_d() 
 
+# option for `basemap` baselayer
 sslave.web <- s.slave.coords %>% st_transform(crs.web)
 hotspots.sslave.web <- setDT(hotspots.sslave %>% 
                                st_transform(crs.web) %>%
@@ -407,10 +437,10 @@ p.sslave <- basemap_ggplot(ext = sslave.web, map_service = 'osm', map_type = 'to
              size = 2.25, show.legend = F) +
   annotation_scale(location = 'tl', width_hint = 0.3) +
   theme_bw() +
-  #coord_sf(crs = crs) +
   scale_color_viridis_d(option = 'mako')
 p.sslave
 
+# animation depending on option chosen
 p.sslave.anim <- p.sslave +
   transition_time(tod) +
   shadow_mark(color = 'maroon', alpha = 0.25, exclude_layer = 3) + # 5 for ggmap
@@ -420,14 +450,17 @@ p.sslave.anim <- p.sslave +
 
 
 num_frames <- length(unique(s.slave$tod))
+# animate gif
 animate(p.sslave.anim, nframes = num_frames, fps = 2)
 anim_save(file.path('anims', "sslave.gif"))
+# animate mp4
 animate(p.sslave.anim, nframes = num_frames, fps = 2, renderer = ffmpeg_renderer())
 anim_save(file.path('anims', "sslave.mp4"))
 
 
 
 #### Enterprise fire  ----
+# filter to time frame for specific fire
 hotspots.enterprise.Aug <- hotspots.enterprise.df[datetime>= as.POSIXct('2023-08-01', tz='UTC')]
 enterprise.Aug <- enterprise.df[datetime>= as.POSIXct('2023-08-01', tz='UTC')]
 
@@ -436,9 +469,6 @@ p.enterprise <- ggmap(enterprisemap) +
              shape = 17, color = 'darkorange', show.legend = F) +
   geom_point(data = enterprise.Aug, aes(x=x, y=y, group = id, color = id), 
              size = 2.25, show.legend = F) +
-  # geom_path(data = s.slave,
-  #           aes(x=x, y=y, group = id, color = id),
-  #           alpha = 0.3, show.legend = F) +
   annotation_scale(location = 'tl', width_hint = 0.3) +
   coord_sf(crs = crs) + 
   scale_color_viridis_d() 
@@ -452,136 +482,10 @@ p.enterprise.anim <- p.enterprise +
   labs(title="{frame_time}", x="Longitude", y="Latitude")
 
 num_frames <- length(unique(enterprise.Aug$tod))
+# animate gif
 animate(p.enterprise.anim, nframes = num_frames, fps = 2)
 anim_save(file.path('anims', "enterprise.gif"))
+# animate mp4
 animate(p.enterprise.anim, nframes = num_frames, fps = 2, renderer = ffmpeg_renderer())
 anim_save(file.path('anims', "enterprise.mp4"))
 
-
-#####
-tods <- unique(enterprise.Aug$tod)
-prog.hotspots.enterprise <- rbindlist(
-  lapply(tods, function(td){
-    sub <- hotspots.enterprise.Aug[tod<as.POSIXct(td,tz = 'UTC', format ='%Y%m%d %H:%M:%OS')]
-    sub[, tod2 := as.POSIXct(td,tz = 'UTC', format ='%Y%m%d %H:%M:%OS')]
-  })
-)
-
-setnames(prog.hotspots.enterprise, old = c('tod', 'tod2'), new = c('tod.sing', 'tod'))
-
-p.enterprise2 <- ggmap(enterprisemap) +
-  geom_point(data = prog.hotspots.enterprise, aes(x=x, y=y, group = seq_along(tod)), 
-             shape = 17, color = 'maroon', show.legend = F) +
-  geom_point(data = hotspots.enterprise.Aug, aes(x=x, y=y, group = seq_along(tod)), 
-             shape = 17, color = 'darkorange', show.legend = F) +
-  geom_point(data = enterprise.Aug, aes(x=x, y=y, group = id, color = id), 
-             size = 2.25, show.legend = F) +
-  # geom_path(data = enterprise.Aug,
-  #           aes(x=x, y=y, group = id, color = id),
-  #           alpha = 0.3, show.legend = F) +
-  scale_color_viridis_d() +
-  annotation_scale(location = 'tl', width_hint = 0.3) +
-  coord_sf(crs=crs)
-p.enterprise2
-
-p.enterprise.anim2 <- p.enterprise2 +
-  #transition_states(tod) +
-  transition_time(tod) +
-  shadow_wake(wake_length = 0.05, exclude_layer = c(3,4)) +
-  #shadow_trail(distance = 0.03, exclude_layer = c(3,4)) + 
-  exit_shrink() +
-  ease_aes('linear') +
-  labs(title="{frame_time}", x="Longitude", y="Latitude")
-animate(p.enterprise.anim2, nframes = num_frames, fps = 2)
-anim_save(file.path('anims', "enterprise2.gif"))
-
-
-
-p.enterprise <- ggmap(enterprisemap) +
-  geom_point(data = hotspots.enterprise.Aug, aes(x=x, y=y, group = seq_along(tod)), 
-             shape = 17, color = 'maroon', show.legend = F) +
-  geom_point(data = hotspots.enterprise.Aug, aes(x=x, y=y, group = seq_along(tod)), 
-             shape = 17, color = 'darkorange', show.legend = F) +
-  geom_point(data = enterprise.Aug, aes(x=x, y=y, group = id, color = id), show.legend = F) +
-  # geom_path(data = s.slave,
-  #           aes(x=x, y=y, group = id, color = id),
-  #           alpha = 0.3, show.legend = F) +
-  annotation_scale(location = 'tl', width_hint = 0.3) +
-  coord_sf(crs = crs) + 
-  scale_color_viridis_d() 
-p.enterprise
-
-p.enterprise.anim <- p.enterprise +
-  transition_time(tod) +
-  #transition_states(tod) +
-  shadow_wake(wake_length = 0.01, exclude_layer = c(2, 3)) +
-  #shadow_mark(color = 'maroon', alpha = 0.25, exclude_layer = 5) +
-  #shadow_trail(distance = 0.01, exclude_layer = c(1)) + 
-  exit_shrink() +
-  ease_aes('linear') +
-  labs(title="{frame_time}", x="Longitude", y="Latitude")
-
-num_frames <- length(unique(enterprise.Aug$tod))
-animate(p.enterprise.anim, nframes = num_frames, fps = 2)
-anim_save(file.path('anims', "enterprise.gif"))
-animate(p.enterprise.anim, nframes = num_frames, fps = 2, renderer = ffmpeg_renderer())
-anim_save(file.path('anims', "enterprise.mp4"))
-
-
-
-
-progression.enterprise.Aug <- filter(progression.enterprise, datetime>= as.POSIXct('2023-08-01', tz='UTC'))
-p.enterprise2 <- ggmap(enterprisemap.bw) +
-  geom_sf(data = progression.enterprise.Aug, aes(group = seq_along(tod)), 
-          fill = 'maroon', color = 'maroon', inherit.aes = F) +
-  geom_point(data = hotspots.enterprise.Aug, aes(x=x, y=y, group = seq_along(tod)), 
-             shape = 17, color = 'darkorange', show.legend = F) +
-  geom_point(data = enterprise.Aug, aes(x=x, y=y, group = id, color = id), show.legend = F) +
-  # geom_path(data = enterprise.Aug,
-  #           aes(x=x, y=y, group = id, color = id),
-  #           alpha = 0.3, show.legend = F) +
-  scale_color_viridis_d() +
-  annotation_scale(location = 'tl', width_hint = 0.3) +
-  coord_sf(crs=crs)
-p.enterprise2
-
-p.enterprise.anim2 <- p.enterprise2 +
-  #transition_states(tod) +
-  transition_time(tod) +
-  #shadow_wake(wake_length = 0.05) +
-  shadow_trail(distance = 0.05) + 
-  #exit_shrink() +
-  ease_aes('linear') +
-  labs(title="{frame_time}", x="Longitude", y="Latitude")
-animate(p.enterprise.anim2, nframes = num_frames, fps = 2)
-anim_save(file.path('anims', "enterprise.gif"))
-
-######OLD######
-p.sslave <- ggmap(sslavemap) +
-  #geom_polygon(data = progression.sslave, aes(group = datetime), fill = 'maroon', inherit.aes = F) +
-  geom_point(data = s.slave, aes(x=x, y=y, group = id, color = id), show.legend = F) +
-  geom_path(data = s.slave,
-            aes(x=x, y=y, group = id, color = id),
-            alpha = 0.3, show.legend = F) +
-  geom_point(data = hotspots.sslave.df, aes(x=x, y=y, group = seq_along(tod)), 
-             shape = 17, color = 'darkorange', show.legend = F) +
-  scale_color_viridis_d()
-p.sslave
-
-p.sslave.anim <- p.sslave +
-  transition_reveal(tod) +
-  # transition_time(datetime) +
-  # shadow_trail(distance = 0.01, max_frames = 10) + 
-  ease_aes('linear') +
-  labs(title="{frame_along}", x="Longitude", y="Latitude")
-
-#num_frames <- as.integer(as.POSIXct('2023-10-01', tz='UTC') - as.POSIXct('2023-05-01', tz='UTC'))*3
-num_frames <- length(unique(hotspots.sslave.df$tod))
-animate(p.sslave.anim, nframes = num_frames, fps = 2)
-anim_save(("sslave_test.gif"))
-length(unique(sslave$id))
-
-progression.sslave.prj <- st_transform(progression.sslave, crs.web)
-#geom_sf(data = progression.sslave, aes(group=tod), fill = 'maroon', color = 'maroon', inherit.aes = F) +
-#geom_point(data = hotspots.sslave.df, aes(x=x, y=y, group = seq_along(tod+1)), 
-#           shape = 17, color = 'maroon', show.legend = F) +

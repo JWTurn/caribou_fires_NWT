@@ -1,8 +1,8 @@
-### Download Data ====
+# Download Data ====
 # Julie Turner
 # Started: 05 January 2024
 
-
+## Load packages ----
 require('move2')
 require('data.table')
 require('sf')
@@ -13,18 +13,19 @@ derived <- file.path('data', 'derived')
 
 
 # GPS DATA ----
-# This will have to be run once if first time using `move2`
+# This will have to be run once if first time using `move2` to load your login credentials
 # movebank_store_credentials("myUserName", "myPassword")
 
 # study names to fill in loop
-# had to go through names on movebank and accept terms for each...
+# had to go through names on movebank and accept terms for each... 
+# there's a way to accept terms from R, but I couldn't get it to work, seems to be an error with this version of `move2`
 dsNames <-c('Dehcho Boreal Woodland Caribou', 
             'Sahtu Boreal Woodland Caribou (2020)', 'South Slave Boreal Woodland Caribou') 
 
 
 
-# make a list of all data from Movebank
-# accepted terms of use on Movebank
+# make a list of all data downloaded from Movebank
+# limited to just 2023 data for this project
 # LAST downloaded 01 Feb. 2024
 move <- list()
 for (ds in 1:length(dsNames)) {
@@ -33,9 +34,10 @@ for (ds in 1:length(dsNames)) {
                                       timestamp_start = as.POSIXct("2023-01-01 00:00:00"),
                                       timestamp_end = as.POSIXct("2023-12-31 23:59:59"))
 }
+# save the raw list if desired
 #saveRDS(move, file.path(raw, 'NWTdata_DL.RDS'))
 
-
+# download the meta data
 move.meta <- list()
 for (ds in 1:length(dsNames)) {
   #hh = 1
@@ -46,7 +48,8 @@ for (ds in 1:length(dsNames)) {
 
 
 
-# pull just the data
+### combine the data ----
+# list of the 3 study areas to loop through with simplified names from `dsNames`
 hab <-c('dehcho', 'sahtu', 'south.slave') 
 
 move.combo <- data.table()
