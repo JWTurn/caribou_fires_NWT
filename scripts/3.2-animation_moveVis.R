@@ -2,6 +2,13 @@
 # Julie Turner
 # Started: 08 January 2024
 
+##############################################################################
+############ At this point, this doesn't work for the fire ###################
+############ animations, just animal movement.             ###################
+##############################################################################
+
+# Sarah Davidson suggested using [Ecodata software](https://www.movebank.org/cms/movebank-content/ecodata) if want to use `moveVis`
+
 #devtools::install_github("16EAGLE/moveVis")
 
 require(data.table)
