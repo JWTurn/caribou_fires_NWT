@@ -9,8 +9,9 @@
 This repository contains code to animate caribou movement relative to
 fire hotspots in Northwest Territories (NWT) from the 2023 fire season.
 Caribou data comes from the Government of Northwest Territories’
-woodland data on movebank. Fire data comes from Natural Resources Canada
-fire hotspots [dataset](https://cwfis.cfs.nrcan.gc.ca/datamart).
+woodland caribou data on movebank. Fire data comes from Natural
+Resources Canada fire hotspots
+[dataset](https://cwfis.cfs.nrcan.gc.ca/datamart).
 
 ### Project organization
 
