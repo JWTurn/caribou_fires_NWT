@@ -35,7 +35,7 @@ for (ds in 1:length(dsNames)) {
                                       timestamp_end = as.POSIXct("2023-12-31 23:59:59"))
 }
 # save the raw list if desired
-#saveRDS(move, file.path(raw, 'NWTdata_DL.RDS'))
+saveRDS(move, file.path(raw, 'NWTdata_DL.RDS'))
 
 # download the meta data
 move.meta <- list()

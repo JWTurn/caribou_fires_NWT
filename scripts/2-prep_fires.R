@@ -56,7 +56,7 @@ fire_nwt.df <- setDT(sfheaders::sf_to_df(fire_nwt, fill = T))
 fire_nwt.df$datetime <- fire_nwt.df$rep_date
 
 #save NWT hotspots
-saveRDS(fire_nwt.df, file.path(raw, 'hotspots2023_nwt.RDS'))
+saveRDS(fire_nwt.df, file.path(derived, 'hotspots2023_nwt.RDS'))
 
 ## fire progressions ----
 # filter to those in NWT polygon
@@ -70,7 +70,7 @@ progression_nwt <- progression %>%
 progression_nwt$datetime <- as.POSIXct(paste0(as.character(progression_nwt$DATE), ' 23:59:59'), tz = 'UTC', 
                                        format ='%Y%m%d %H:%M:%OS')
 # save NWT progressions
-st_write(progression_nwt, file.path(raw, 'progression_nwt.shp'), append = F)
+st_write(progression_nwt, file.path(derived, 'progression_nwt.shp'), append = F)
 
 
 
