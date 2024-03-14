@@ -28,9 +28,9 @@ derived <- file.path('data', 'derived')
 cbou <- readRDS(file.path(raw, 'NWTdat.RDS'))
 
 # prepared fires data
-hotspots <- readRDS(file.path(raw, 'hotspots2023_nwt.RDS'))
+hotspots <- readRDS(file.path(derived, 'hotspots2023_nwt.RDS'))
 
-progression <- st_read(file.path(raw, 'progression_nwt.shp'))
+progression <- st_read(file.path(derived, 'progression_nwt.shp'))
 burns <- st_read(file.path(raw, 'FireShapefiles', 'brnGEE_2023_Merge.shp'))
 
 
