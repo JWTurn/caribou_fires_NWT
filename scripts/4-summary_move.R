@@ -30,7 +30,8 @@ burns <- st_read(file.path(raw, 'FireShapefiles', 'brnGEE_2023_Merge.shp'))
 
 # prep ----
 crs <- st_crs(4326)$wkt
-crs.web <- st_crs(3857)$wkt
+# use NWT crs for accurate step length estimates
+crs.web <- st_crs(3580)$wkt
 
 ## focal fires ----
 # 15km buffered enterprise fire
@@ -333,3 +334,4 @@ ggplot(enterprise.Aug, aes(sl_)) +
     axis.text.y = element_text(size=20),
     legend.title=element_text(size=20),
     legend.text = element_text(size = 20)) 
+
