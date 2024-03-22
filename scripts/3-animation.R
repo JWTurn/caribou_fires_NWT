@@ -436,7 +436,7 @@ p.sahtuzoom <- basemap_ggplot(ext = sahtuzoom.web, map_service = 'osm', map_type
              size = 2.25, show.legend = F) +
   annotation_scale(location = 'tl', width_hint = 0.3) +
   theme_bw() +
-  scale_color_viridis_d(option = 'mako')
+  scale_color_viridis_d(option = 'viridis')
 p.sahtuzoom
 
 # animation based on either option
