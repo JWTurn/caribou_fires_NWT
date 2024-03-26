@@ -1,9 +1,10 @@
 # Fires and Caribou animations ====
+# using `ggmap` base maps
 # Julie Turner
 # Started: 08 January 2024
 
 ## load packages ----
-# need older `transformr`
+# need older `transformr` for `gganimate`
 #devtools::install_version("transformr", version = "0.1.3")
 
 require(data.table)
@@ -14,9 +15,8 @@ require(dplyr)
 require(tidyr)
 require(amt)
 require(ggplot2)
-require(ggmap)
 require(ggspatial)
-require(basemaps)
+require(ggmap)
 require(gganimate)
 require(gifski)
 
@@ -35,8 +35,6 @@ burns <- st_read(file.path(raw, 'FireShapefiles', 'brnGEE_2023_Merge.shp'))
 
 
 # prep ----
-# pseudo mercator for web maps (needed for `basemaps` baselayers)
-crs.web <- st_crs(3857)$wkt
 crs <- st_crs(4326)$wkt
 
 
@@ -122,30 +120,24 @@ sslave.df <- setDT(s.slave.coords %>%
                      sfheaders::sf_to_df(fill = T))
 
 # caribou gps points within 15km of the zoomed in fire to define area
-# also creating with web crs
+# also creating with crs
 enterprise <- cbou.coords %>%
   st_join(enterprise.f, join = st_within) %>%
   filter(!is.na(FIRENUM))
 enterprise.df <- setDT(sfheaders::sf_to_df(enterprise, fill = T))
-enterprise.df.web <- setDT(enterprise %>%
-                     st_transform(crs.web) %>%
-                     sfheaders::sf_to_df(fill = T))
+
 
 dehchozoom <- cbou.coords %>%
   st_join(dehchozoom.f, join = st_within) %>%
   filter(!is.na(FIRENUM))
 dehchozoom.df <- setDT(sfheaders::sf_to_df(dehchozoom, fill = T))
-dehchozoom.df.web <- setDT(dehchozoom %>%
-                             st_transform(crs.web) %>%
-                             sfheaders::sf_to_df(fill = T))
+
 
 sahtuzoom <- cbou.coords %>%
   st_join(sahtuzoom.f, join = st_within) %>%
   filter(!is.na(FIRENUM))
 sahtuzoom.df <- setDT(sfheaders::sf_to_df(sahtuzoom, fill = T))
-sahtuzoom.df.web <- setDT(sahtuzoom %>%
-                             st_transform(crs.web) %>%
-                             sfheaders::sf_to_df(fill = T))
+
 
 ## now finally defining the extents
 cbou.ext <- st_bbox(cbou.coords)
@@ -210,7 +202,7 @@ progression.sub$datetime <- as.POSIXct(paste0(as.character(progression.sub$DATE)
 progression.sub$tod <- lubridate::ceiling_date(progression.sub$datetime, "8 hours")
 
 progression.bou <- progression.sub %>%
-  st_transform(crs.web) %>%
+  st_transform(crs) %>%
   st_crop(cbou.ext)
 
 
@@ -267,30 +259,13 @@ p.dehcho <- ggmap(dehchomap) +
   annotation_scale(location = 'tl', width_hint = 0.3) +
   coord_sf(crs = crs) + 
   scale_color_viridis_d(option = 'mako') 
-
-# option for `basemap` baselayer
-dehcho.web <- dehcho.coords %>% st_transform(crs.web)
-dehcho.web.df <- setDT(dehcho.web %>%
-                     sfheaders::sf_to_df(fill = T))
-hotspots.dehcho.web <- setDT(hotspots.dehcho %>% 
-                               st_transform(crs.web) %>%
-                               sfheaders::sf_to_df(fill = T))
-
-p.dehcho <- basemap_ggplot(ext = dehcho.web, map_service = 'osm', map_type = 'topographic') +
-  geom_point(data = hotspots.dehcho.web, aes(x=x, y=y, group = seq_along(tod)),
-             shape = 17, color = 'darkorange', show.legend = F) +
-  geom_point(data = dehcho.web.df, aes(x=x, y=y, group = id, color = id),
-             size = 2.25, show.legend = F) +
-  annotation_scale(location = 'tl', width_hint = 0.3) +
-  theme_bw() +
-  scale_color_viridis_d(option = 'mako')
 p.dehcho
 
-# animation based on either option
+# animation 
 p.dehcho.anim <- p.dehcho +
   transition_time(tod) +
   # create aftermark of hotspots only
-  shadow_mark(color = 'maroon', alpha = 0.25, exclude_layer = 3) + # layer 5 for ggmap
+  shadow_mark(color = 'maroon', alpha = 0.25, exclude_layer = 5) + 
   # shrinking trail as points disappear
   exit_shrink() +
   # makes animations smoother
@@ -319,28 +294,12 @@ p.dehchozoom <- ggmap(dehchozoommap) +
   coord_sf(crs = crs) + 
   scale_color_viridis_d() 
 
-# option for `basemap` baselayer
-dehchozoom.Aug <- dehchozoom.df.web[datetime>= as.POSIXct('2023-08-01', tz='UTC')]
-dehchozoom.web <- dehchozoom.f %>% st_transform(crs.web)
-hotspots.dehchozoom.web <- hotspots.dehchozoom %>% 
-                               filter(datetime >= as.POSIXct('2023-08-01', tz='UTC')) %>% 
-                               st_transform(crs.web) 
-hotspots.dehchozoom.web.df <- setDT(sfheaders::sf_to_df(hotspots.dehchozoom.web, fill = T))
-
-p.dehchozoom <- basemap_ggplot(ext = dehchozoom.web, map_service = 'osm', map_type = 'topographic') +
-  geom_point(data = hotspots.dehchozoom.web.df, aes(x=x, y=y, group = seq_along(tod)),
-             shape = 17, color = 'darkorange', show.legend = F) +
-  geom_point(data = dehchozoom.Aug, aes(x=x, y=y, group = id, color = id),
-             size = 2.25, show.legend = F) +
-  annotation_scale(location = 'tl', width_hint = 0.3) +
-  theme_bw() +
-  scale_color_viridis_d(option = 'mako')
 p.dehchozoom
 
-# animation based on either option
+# animation
 p.dehchozoom.anim <- p.dehchozoom +
   transition_time(tod) +
-  shadow_mark(color = 'maroon', alpha = 0.25, exclude_layer = 3) + #5 for ggmap
+  shadow_mark(color = 'maroon', alpha = 0.25, exclude_layer = 5) + 
   exit_shrink() +
   ease_aes('linear') +
   labs(title="{frame_time}", x="", y="")
@@ -366,30 +325,12 @@ p.sahtu <- ggmap(sahtumap) +
   coord_sf(crs = crs) + 
   scale_color_viridis_d() 
 
-# option for `basemap` baselayer
-sahtu.web <- sahtu.coords %>% st_transform(crs.web)
-sahtu.web.df <- setDT(sahtu.web %>%
-                         sfheaders::sf_to_df(fill = T))
-hotspots.sahtu.web <- setDT(hotspots.sahtu %>% 
-                               st_transform(crs.web) %>%
-                               sfheaders::sf_to_df(fill = T))
-
-p.sahtu <-
-  basemap_ggplot(ext = sahtu.web, map_service = 'osm', map_type = 'topographic') +
-  geom_point(data = hotspots.sahtu.web, aes(x=x, y=y, group = seq_along(tod)),
-             shape = 17, color = 'darkorange', show.legend = F) +
-  geom_point(data = sahtu.web.df, aes(x=x, y=y, group = id, color = id),
-             size = 2.25, show.legend = F) +
-  annotation_scale(location = 'tl', width_hint = 0.3) +
-  theme_bw() +
-  #coord_sf(crs = crs) +
-  scale_color_viridis_d(option = 'mako')
 p.sahtu
 
-# animation depending which option chosen
+# animation
 p.sahtu.anim <- p.sahtu +
   transition_time(tod) +
-  shadow_mark(color = 'maroon', alpha = 0.25, exclude_layer = 3) + # layer 5 for ggmap
+  shadow_mark(color = 'maroon', alpha = 0.25, exclude_layer = 5) + 
   exit_shrink() +
   ease_aes('linear') +
   labs(title="{frame_time}", x="Longitude", y="Latitude")
@@ -419,30 +360,12 @@ p.sahtuzoom <- ggmap(sahtuzoommap) +
   coord_sf(crs = crs) + 
   scale_color_viridis_d() 
 
-# option for `basemap` baselayer
-sahtuzoom.Jul <- sahtuzoom.df.web[datetime %between% c(as.POSIXct('2023-07-01', tz='UTC'),
-                                                       as.POSIXct('2023-08-01', tz='UTC'))]
-sahtuzoom.web <- sahtuzoom.f %>% st_transform(crs.web)
-hotspots.sahtuzoom.web <- hotspots.sahtuzoom %>% 
-  filter(dplyr::between(datetime, as.POSIXct('2023-07-01', tz='UTC'),
-                              as.POSIXct('2023-08-01', tz='UTC'))) %>% 
-  st_transform(crs.web) 
-hotspots.sahtuzoom.web.df <- setDT(sfheaders::sf_to_df(hotspots.sahtuzoom.web, fill = T))
-
-p.sahtuzoom <- basemap_ggplot(ext = sahtuzoom.web, map_service = 'osm', map_type = 'topographic') +
-  geom_point(data = hotspots.sahtuzoom.web.df, aes(x=x, y=y, group = seq_along(tod)),
-             shape = 17, color = 'darkorange', show.legend = F) +
-  geom_point(data = sahtuzoom.Jul, aes(x=x, y=y, group = id, color = id),
-             size = 2.25, show.legend = F) +
-  annotation_scale(location = 'tl', width_hint = 0.3) +
-  theme_bw() +
-  scale_color_viridis_d(option = 'viridis')
 p.sahtuzoom
 
-# animation based on either option
+# animation 
 p.sahtuzoom.anim <- p.sahtuzoom +
   transition_time(tod) +
-  shadow_mark(color = 'maroon', alpha = 0.25, exclude_layer = 3) + #5 for ggmap
+  shadow_mark(color = 'maroon', alpha = 0.25, exclude_layer = 5) + 
   exit_shrink() +
   ease_aes('linear') +
   labs(title="{frame_time}", x="", y="")
@@ -468,28 +391,12 @@ p.sslave <- ggmap(sslavemap) +
   coord_sf(crs = crs) + 
   scale_color_viridis_d() 
 
-# option for `basemap` baselayer
-sslave.web <- s.slave.coords %>% st_transform(crs.web)
-sslave.web.df <- setDT(sslave.web %>%
-                         sfheaders::sf_to_df(fill = T))
-hotspots.sslave.web <- setDT(hotspots.sslave %>% 
-                               st_transform(crs.web) %>%
-                               sfheaders::sf_to_df(fill = T))
-
-p.sslave <- basemap_ggplot(ext = sslave.web, map_service = 'osm', map_type = 'topographic') +
-  geom_point(data = hotspots.sslave.web, aes(x=x, y=y, group = seq_along(tod)),
-             shape = 17, color = 'darkorange', show.legend = F) +
-  geom_point(data = sslave.web.df, aes(x=x, y=y, group = id, color = id),
-             size = 2.25, show.legend = F) +
-  annotation_scale(location = 'tl', width_hint = 0.3) +
-  theme_bw() +
-  scale_color_viridis_d(option = 'mako')
 p.sslave
 
-# animation depending on option chosen
+# animation
 p.sslave.anim <- p.sslave +
   transition_time(tod) +
-  shadow_mark(color = 'maroon', alpha = 0.25, exclude_layer = 3) + # 5 for ggmap
+  shadow_mark(color = 'maroon', alpha = 0.25, exclude_layer = 5) + 
   exit_shrink() +
   ease_aes('linear') +
   labs(title="{frame_time}", x="", y="")
@@ -519,28 +426,12 @@ p.enterprise <- ggmap(enterprisemap) +
   coord_sf(crs = crs) + 
   scale_color_viridis_d() 
 
-# option for `basemap` baselayer
-enterprise.Aug <- enterprise.df.web[datetime>= as.POSIXct('2023-08-01', tz='UTC')]
-enterprise.web <- enterprise.f %>% st_transform(crs.web)
-hotspots.enterprise.web <- hotspots.enterprise %>% 
-  filter(datetime >= as.POSIXct('2023-08-01', tz='UTC')) %>% 
-  st_transform(crs.web) 
-hotspots.enterprise.web.df <- setDT(sfheaders::sf_to_df(hotspots.enterprise.web, fill = T))
-
-p.enterprise <- basemap_ggplot(ext = enterprise.web, map_service = 'osm', map_type = 'topographic') +
-  geom_point(data = hotspots.enterprise.web.df, aes(x=x, y=y, group = seq_along(tod)),
-             shape = 17, color = 'darkorange', show.legend = F) +
-  geom_point(data = enterprise.Aug, aes(x=x, y=y, group = id, color = id),
-             size = 2.25, show.legend = F) +
-  annotation_scale(location = 'tl', width_hint = 0.3) +
-  theme_bw() +
-  scale_color_viridis_d(option = 'mako')
 p.enterprise
 
-# animation based on either option
+# animation
 p.enterprise.anim <- p.enterprise +
   transition_time(tod) +
-  shadow_mark(color = 'maroon', alpha = 0.25, exclude_layer = 3) + #5 for ggmap
+  shadow_mark(color = 'maroon', alpha = 0.25, exclude_layer = 5) + 
   exit_shrink() +
   ease_aes('linear') +
   labs(title="{frame_time}", x="", y="")
