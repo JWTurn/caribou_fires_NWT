@@ -193,6 +193,29 @@ ggplot(dehchozoom.Aug, aes(t1_, sl_, group = id)) +
     legend.title=element_text(size=20),
     legend.text = element_text(size = 20)) 
 
+ggplot(dehchozoom.Aug, aes(t1_, sl_)) +
+  geom_point(aes(color = burned)) +
+  geom_smooth(se = F) +
+  geom_vline(xintercept = as.POSIXct('2023-08-13', tz='UTC'), color = 'darkorange') +
+  geom_vline(xintercept = as.POSIXct('2023-09-24', tz='UTC'), color = 'darkorange') +
+  scale_color_manual(values = c('black', 'darkorange', 'maroon')) +
+  ylab("Step lengths (m)/8-hours")+
+  xlab('Date') +
+  ylim(c(0, 10000)) +
+  facet_wrap(~id) +
+  theme_bw() + theme(
+    panel.background =element_rect(colour = "black", fill=NA, size=1),
+    panel.border = element_blank(),
+    panel.grid.major = element_blank(),
+    panel.grid.minor = element_blank(),
+    plot.title = element_text(size = 20, hjust = .98, vjust = -8),
+    axis.line = element_line(colour = "black", size = .1),
+    axis.text.x = element_text(size=14),
+    axis.title = element_text(size=18),
+    axis.text.y = element_text(size=14),
+    legend.title=element_text(size=16),
+    legend.text = element_text(size = 14)) 
+
 sum.dehchozoom.infire <- dehchozoom.Aug[, .(median = median(sl_, na.rm = T), 
                                             mean = mean(sl_, na.rm = T), sd = sd(sl_, na.rm = T)), by = .(in.fire)]
 ggplot(dehchozoom.Aug, aes(sl_)) + 
@@ -311,6 +334,30 @@ ggplot(enterprise.Aug, aes(t1_, sl_, group = id)) +
     axis.text.y = element_text(size=20),
     legend.title=element_text(size=20),
     legend.text = element_text(size = 20)) 
+
+
+ggplot(enterprise.Aug, aes(t1_, sl_)) +
+  geom_point(aes(color = burned)) +
+  geom_smooth(se = F) +
+  geom_vline(xintercept = as.POSIXct('2023-08-03', tz='UTC'), color = 'darkorange') +
+  geom_vline(xintercept = as.POSIXct('2023-09-24', tz='UTC'), color = 'darkorange') +
+  scale_color_manual(values = c('black', 'darkorange', 'maroon')) +
+  ylab("Step lengths (m)/8-hours")+
+  xlab('Date') +
+  ylim(c(0, 16000)) +
+  facet_wrap(~id) +
+  theme_bw() + theme(
+    panel.background =element_rect(colour = "black", fill=NA, size=1),
+    panel.border = element_blank(),
+    panel.grid.major = element_blank(),
+    panel.grid.minor = element_blank(),
+    plot.title = element_text(size = 20, hjust = .98, vjust = -8),
+    axis.line = element_line(colour = "black", size = .1),
+    axis.text.x = element_text(size=14),
+    axis.title = element_text(size=18),
+    axis.text.y = element_text(size=14),
+    legend.title=element_text(size=16),
+    legend.text = element_text(size = 14)) 
 
 
 sum.enterprise.burned <- enterprise.Aug[, .(median = median(sl_, na.rm = T), 
