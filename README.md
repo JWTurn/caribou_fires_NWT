@@ -9,9 +9,9 @@
 This repository contains code to animate caribou movement relative to
 fire hotspots in Northwest Territories (NWT) from the 2023 fire season.
 Caribou data comes from the Government of Northwest Territories’
-woodland caribou data on movebank. Fire data comes from Natural
+woodland caribou data on Movebank. Fire data comes from Natural
 Resources Canada fire hotspots
-[dataset](https://cwfis.cfs.nrcan.gc.ca/datamart).
+[datasets](https://cwfis.cfs.nrcan.gc.ca/datamart).
 
 ### Project organization
 
@@ -30,13 +30,16 @@ The project folder structure is as follows:
 ```
 
 The `data` folder contains `raw` data from the source, and the `derived`
-data that was prepared for the animations. `CanadaPoly` contains a
+data that were prepared for the animations. `CanadaPoly` contains a
 polygon of Canadian provinces and territories from [Statistics
 Canada](https://www12.statcan.gc.ca/census-recensement/2021/geo/sip-pis/boundary-limites/index2021-eng.cfm?year=21)
 to filter data to NWT. `cwfis` contains the NRCan fires
 [data](https://cwfis.cfs.nrcan.gc.ca/datamart). The `FireShapefiles`
-data was provided by GNWT.
+data were provided by GNWT.
 
 The `scripts` folder contains the R code necessary to prepare and
-animate the data in numerical order. The `anims` folder is where the
-animations will be saved.
+animate the data in numerical order. There are two separate scripts that
+create the animations. One using the `basemaps` package for the base map
+and another using `ggmap` for the base map depending on needs for future
+use. The `basemaps` version is the one that created 2023 deliverables.
+The `anims` folder is where the animations will be saved.
