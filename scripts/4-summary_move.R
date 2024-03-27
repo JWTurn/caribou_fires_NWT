@@ -71,7 +71,7 @@ cbou.proj <- setDT(st_as_sf(cbou.MayOct, coords = c('x', 'y')) %>%
   sfheaders::sf_to_df(fill = T))
 
 
-
+# create standardized tracks with steps at 8 hour intervals for comparable SLs
 trk <- cbou.proj %>% make_track(x,y, datetime, crs = crs.web, all_cols = T) %>%
   nest(data = -'id') %>%
   mutate(steps = map(data, function(x) 
@@ -81,11 +81,11 @@ trk <- cbou.proj %>% make_track(x,y, datetime, crs = crs.web, all_cols = T) %>%
 
 trk.dt <- setDT(trk)
 
-# make an sf object
+# make an sf object of caribou locs
 cbou.coords <- st_as_sf(trk.dt, coords = c('x1_', 'y1_')) %>%
   st_set_crs(crs.web)
 
-# Join locs and fires based on intersections
+# Join locs and fires based on intersections with fire progressions
 joined <- st_join(
   cbou.coords,
   progression.proj,
@@ -132,25 +132,28 @@ sahtuzoom.df <- setDT(sfheaders::sf_to_df(sahtuzoom, fill = T))
 #### dehcho zoom ----
 # filter to right time period for the specific fire, starting ~1 month prior
 dehchozoom.Aug <- dehchozoom.df[t1_>= as.POSIXct('2023-07-15', tz='UTC')]
-# fire start 8-13
-# fire "end" 9-24
+# fire start ~8-13
+# fire "end" ~9-24
 # NOTE: there are very few days in the after period since data ends 9-29
 dehchozoom.Aug[, fire:= ifelse(t1_<= as.POSIXct('2023-08-13', tz='UTC'), 'before',
                                ifelse(t1_>= as.POSIXct('2023-09-24', tz='UTC'), 'after', 'during'))]
 summary(as.factor(dehchozoom.Aug$fire))
 dehchozoom.Aug[,.(mean(sl_, na.rm = T)), by = .(fire)]
 
+# create variable `burned` if they start their step in a burning area or not based on daily progressions
 dehchozoom.Aug[abs(diff.time)<2, burned:= 'burning']
 dehchozoom.Aug[diff.time>=2, burned:= 'burned']
 dehchozoom.Aug[is.na(diff.time)|diff.time<=-2, burned:= 'not burned']
 summary(as.factor(dehchozoom.Aug$burned))
 
+# set factor level order
 dehchozoom.Aug$fire <- factor(dehchozoom.Aug$fire, levels = c('before', 'during', 'after'))
 dehchozoom.Aug$burned <- factor(dehchozoom.Aug$burned, levels = c('not burned', 'burning', 'burned'))
 
-
+# summary of SLs based on if they are before, during, or after fire
 sum.dehchozoom.fire <- dehchozoom.Aug[, .(median = median(sl_, na.rm = T), 
                        mean = mean(sl_, na.rm = T), sd = sd(sl_, na.rm = T)), by = .(fire)]
+# plot SLs based on if they are before, during, or after fire
 ggplot(dehchozoom.Aug, aes(sl_)) + 
   geom_density(aes(fill = fire), alpha = 0.4) +
   geom_vline(data = sum.dehchozoom.fire, aes(xintercept=mean, color = fire)) +
@@ -171,6 +174,7 @@ ggplot(dehchozoom.Aug, aes(sl_)) +
     legend.title=element_text(size=20),
     legend.text = element_text(size = 20)) 
 
+# plot of indiv SLs over the fire period -- 1 plot
 ggplot(dehchozoom.Aug, aes(t1_, sl_, group = id)) +
   geom_point(aes(color = id)) +
   geom_smooth(aes(fill =id, color = id)) +
@@ -193,6 +197,7 @@ ggplot(dehchozoom.Aug, aes(t1_, sl_, group = id)) +
     legend.title=element_text(size=20),
     legend.text = element_text(size = 20)) 
 
+# plot of indiv SLs over the fire period -- plot/indiv
 ggplot(dehchozoom.Aug, aes(t1_, sl_)) +
   geom_point(aes(color = burned)) +
   geom_smooth(se = F) +
@@ -216,6 +221,7 @@ ggplot(dehchozoom.Aug, aes(t1_, sl_)) +
     legend.title=element_text(size=16),
     legend.text = element_text(size = 14)) 
 
+# summary of SLs based on if they start in a fire or not
 sum.dehchozoom.infire <- dehchozoom.Aug[, .(median = median(sl_, na.rm = T), 
                                             mean = mean(sl_, na.rm = T), sd = sd(sl_, na.rm = T)), by = .(in.fire)]
 ggplot(dehchozoom.Aug, aes(sl_)) + 
@@ -238,8 +244,10 @@ ggplot(dehchozoom.Aug, aes(sl_)) +
     legend.title=element_text(size=20),
     legend.text = element_text(size = 20)) 
 
+# summary of SLs based on the burn status that the step starts in
 sum.dehchozoom.burned <- dehchozoom.Aug[, .(median = median(sl_, na.rm = T), 
                                             mean = mean(sl_, na.rm = T), sd = sd(sl_, na.rm = T)), by = .(burned)]
+# plot of SL distributions based on the burn status that the step starts in
 ggplot(dehchozoom.Aug, aes(sl_)) + 
   geom_density(aes(fill = burned), alpha = 0.4) +
   geom_vline(data = sum.dehchozoom.burned, aes(xintercept=mean, color = burned)) +
@@ -262,6 +270,7 @@ ggplot(dehchozoom.Aug, aes(sl_)) +
 
 #### sahtu zoom ----
 # filter to time frame relevant for specfic fire
+# NOTE: I haven't made plots for this yet since it's only 1 individual in the fire and 1 nearby...
 hotspots.sahtuzoom.Jul <- hotspots.sahtuzoom.df[datetime %between% c(as.POSIXct('2023-07-01', tz='UTC'),
                                                                      as.POSIXct('2023-08-01', tz='UTC'))]
 sahtuzoom.Jul <- sahtuzoom.df[datetime %between% c(as.POSIXct('2023-07-01', tz='UTC'),
@@ -272,26 +281,31 @@ sahtuzoom.Jul <- sahtuzoom.df[datetime %between% c(as.POSIXct('2023-07-01', tz='
 # try to capture month before
 enterprise.Aug <- enterprise.df[t1_>= as.POSIXct('2023-07-01', tz='UTC')]
 
-# fire start 8-03
-# fire "end" 9-24
+# fire start ~8-03
+# fire "end" ~9-24
 # NOTE: there are very few days in the after period since data ends 9-29
 enterprise.Aug[, fire:= ifelse(t1_<= as.POSIXct('2023-08-03', tz='UTC'), 'before',
                                ifelse(t1_>= as.POSIXct('2023-09-24', tz='UTC'), 'after', 'during'))]
 summary(as.factor(enterprise.Aug$fire))
 enterprise.Aug[,.(mean(sl_, na.rm = T)), by = .(fire)]
 
+# create variable `burned` if they start their step in a burning area or not based on daily progressions
 enterprise.Aug[abs(diff.time)<2, burned:= 'burning']
 enterprise.Aug[diff.time>=2, burned:= 'burned']
 enterprise.Aug[is.na(diff.time)|diff.time<=-2, burned:= 'not burned']
 summary(as.factor(enterprise.Aug$burned))
 
+# set factor level order
 enterprise.Aug$fire <- factor(enterprise.Aug$fire, levels = c('before', 'during', 'after'))
 enterprise.Aug$burned <- factor(enterprise.Aug$burned, levels = c('not burned', 'burning', 'burned'))
 
 
 quantile(enterprise.Aug$sl_)
+
+# summary of SLs before, during, after fire
 sum.enterprise.fire <- enterprise.Aug[, .(median = median(sl_, na.rm = T), 
                                           mean = mean(sl_, na.rm = T), sd = sd(sl_, na.rm = T)), by = .(fire)]
+# plot SL distribution before, during, after fire
 ggplot(enterprise.Aug, aes(sl_)) + 
   geom_density(aes(fill = fire), alpha = 0.4) +
   geom_vline(data = sum.enterprise.fire, aes(xintercept=mean, color = fire)) +
@@ -312,6 +326,7 @@ ggplot(enterprise.Aug, aes(sl_)) +
     legend.title=element_text(size=20),
     legend.text = element_text(size = 20)) 
 
+# plot of indiv SLs over the fire period -- 1 plot
 ggplot(enterprise.Aug, aes(t1_, sl_, group = id)) +
   geom_point(aes(color = id)) +
   geom_smooth(aes(fill =id, color = id)) +
@@ -335,7 +350,7 @@ ggplot(enterprise.Aug, aes(t1_, sl_, group = id)) +
     legend.title=element_text(size=20),
     legend.text = element_text(size = 20)) 
 
-
+# plot of indiv SLs over the fire period -- plot/indiv
 ggplot(enterprise.Aug, aes(t1_, sl_)) +
   geom_point(aes(color = burned)) +
   geom_smooth(se = F) +
@@ -359,9 +374,10 @@ ggplot(enterprise.Aug, aes(t1_, sl_)) +
     legend.title=element_text(size=16),
     legend.text = element_text(size = 14)) 
 
-
+# summary SLs if start step in not burned, burning, and previously burned 
 sum.enterprise.burned <- enterprise.Aug[, .(median = median(sl_, na.rm = T), 
                                             mean = mean(sl_, na.rm = T), sd = sd(sl_, na.rm = T)), by = .(burned)]
+# plot distributions SLs if start step in not burned, burning, and previously burned 
 ggplot(enterprise.Aug, aes(sl_)) + 
   geom_density(aes(fill = burned), alpha = 0.4) +
   geom_vline(data = sum.enterprise.burned, aes(xintercept=mean, color = burned)) +
