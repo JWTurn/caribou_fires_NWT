@@ -1,6 +1,8 @@
 
 ## Animations of fires and woodland caribou movement in NWT 2023
 
+[![DOI](https://zenodo.org/badge/739563474.svg)](https://zenodo.org/doi/10.5281/zenodo.13274440)
+
 - Authors:
   - [Julie W. Turner](https://www.julwturner.com)
   - James Hodson
